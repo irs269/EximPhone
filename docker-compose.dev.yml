@@ -1,0 +1,22 @@
+# Development override: debug logs + OpenLDAP with 20 fictional employees.
+services:
+  api:
+    environment: {LOG_LEVEL: debug}
+    depends_on:
+      ldap-mock: {condition: service_healthy}
+  ldap-mock:
+    image: osixia/openldap:1.5.0
+    command: ["--copy-service"]
+    environment:
+      LDAP_ORGANISATION: Exim Bank
+      LDAP_DOMAIN: exim.local
+      LDAP_ADMIN_PASSWORD: ${LDAP_ADMIN_PASSWORD}
+    volumes:
+      - ./ldap-mock/employees.ldif:/container/service/slapd/assets/config/bootstrap/ldif/custom/employees.ldif:ro
+    networks: [data]
+    healthcheck:
+      test: ["CMD-SHELL", "ldapsearch -x -H ldap://localhost -b dc=exim,dc=local -D cn=admin,dc=exim,dc=local -w $${LDAP_ADMIN_PASSWORD} -s base dn"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s

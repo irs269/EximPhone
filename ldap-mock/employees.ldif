@@ -1,0 +1,244 @@
+dn: ou=people,dc=exim,dc=local
+objectClass: organizationalUnit
+ou: people
+
+dn: uid=asaid,ou=people,dc=exim,dc=local
+objectClass: inetOrgPerson
+uid: asaid
+cn: Amina Said
+givenName: Amina
+sn: Said
+mail: asaid@exim.local
+telephoneNumber: 2001
+departmentNumber: IT
+physicalDeliveryOfficeName: HQ
+userPassword: Demo-Passw0rd!
+
+dn: uid=ahassan,ou=people,dc=exim,dc=local
+objectClass: inetOrgPerson
+uid: ahassan
+cn: Ali Hassan
+givenName: Ali
+sn: Hassan
+mail: ahassan@exim.local
+telephoneNumber: 2002
+departmentNumber: HR
+physicalDeliveryOfficeName: Agency-North
+userPassword: Demo-Passw0rd!
+
+dn: uid=fmohamed,ou=people,dc=exim,dc=local
+objectClass: inetOrgPerson
+uid: fmohamed
+cn: Fatima Mohamed
+givenName: Fatima
+sn: Mohamed
+mail: fmohamed@exim.local
+telephoneNumber: 2003
+departmentNumber: Finance
+physicalDeliveryOfficeName: Agency-South
+userPassword: Demo-Passw0rd!
+
+dn: uid=oabdallah,ou=people,dc=exim,dc=local
+objectClass: inetOrgPerson
+uid: oabdallah
+cn: Omar Abdallah
+givenName: Omar
+sn: Abdallah
+mail: oabdallah@exim.local
+telephoneNumber: 2004
+departmentNumber: Operations
+physicalDeliveryOfficeName: HQ
+userPassword: Demo-Passw0rd!
+
+dn: uid=zali,ou=people,dc=exim,dc=local
+objectClass: inetOrgPerson
+uid: zali
+cn: Zainab Ali
+givenName: Zainab
+sn: Ali
+mail: zali@exim.local
+telephoneNumber: 2005
+departmentNumber: Communication
+physicalDeliveryOfficeName: Agency-North
+userPassword: Demo-Passw0rd!
+
+dn: uid=ysalim,ou=people,dc=exim,dc=local
+objectClass: inetOrgPerson
+uid: ysalim
+cn: Yusuf Salim
+givenName: Yusuf
+sn: Salim
+mail: ysalim@exim.local
+telephoneNumber: 2006
+departmentNumber: IT
+physicalDeliveryOfficeName: Agency-South
+userPassword: Demo-Passw0rd!
+
+dn: uid=mjuma,ou=people,dc=exim,dc=local
+objectClass: inetOrgPerson
+uid: mjuma
+cn: Mariam Juma
+givenName: Mariam
+sn: Juma
+mail: mjuma@exim.local
+telephoneNumber: 2007
+departmentNumber: HR
+physicalDeliveryOfficeName: HQ
+userPassword: Demo-Passw0rd!
+
+dn: uid=hkhamis,ou=people,dc=exim,dc=local
+objectClass: inetOrgPerson
+uid: hkhamis
+cn: Hamad Khamis
+givenName: Hamad
+sn: Khamis
+mail: hkhamis@exim.local
+telephoneNumber: 2008
+departmentNumber: Finance
+physicalDeliveryOfficeName: Agency-North
+userPassword: Demo-Passw0rd!
+
+dn: uid=snassor,ou=people,dc=exim,dc=local
+objectClass: inetOrgPerson
+uid: snassor
+cn: Salma Nassor
+givenName: Salma
+sn: Nassor
+mail: snassor@exim.local
+telephoneNumber: 2009
+departmentNumber: Operations
+physicalDeliveryOfficeName: Agency-South
+userPassword: Demo-Passw0rd!
+
+dn: uid=imoussa,ou=people,dc=exim,dc=local
+objectClass: inetOrgPerson
+uid: imoussa
+cn: Idrissa Moussa
+givenName: Idrissa
+sn: Moussa
+mail: imoussa@exim.local
+telephoneNumber: 2010
+departmentNumber: Communication
+physicalDeliveryOfficeName: HQ
+userPassword: Demo-Passw0rd!
+
+dn: uid=nahmed,ou=people,dc=exim,dc=local
+objectClass: inetOrgPerson
+uid: nahmed
+cn: Naima Ahmed
+givenName: Naima
+sn: Ahmed
+mail: nahmed@exim.local
+telephoneNumber: 2011
+departmentNumber: IT
+physicalDeliveryOfficeName: Agency-North
+userPassword: Demo-Passw0rd!
+
+dn: uid=romar,ou=people,dc=exim,dc=local
+objectClass: inetOrgPerson
+uid: romar
+cn: Rashid Omar
+givenName: Rashid
+sn: Omar
+mail: romar@exim.local
+telephoneNumber: 2012
+departmentNumber: HR
+physicalDeliveryOfficeName: Agency-South
+userPassword: Demo-Passw0rd!
+
+dn: uid=hbakari,ou=people,dc=exim,dc=local
+objectClass: inetOrgPerson
+uid: hbakari
+cn: Halima Bakari
+givenName: Halima
+sn: Bakari
+mail: hbakari@exim.local
+telephoneNumber: 2013
+departmentNumber: Finance
+physicalDeliveryOfficeName: HQ
+userPassword: Demo-Passw0rd!
+
+dn: uid=imwinyi,ou=people,dc=exim,dc=local
+objectClass: inetOrgPerson
+uid: imwinyi
+cn: Issa Mwinyi
+givenName: Issa
+sn: Mwinyi
+mail: imwinyi@exim.local
+telephoneNumber: 2014
+departmentNumber: Operations
+physicalDeliveryOfficeName: Agency-North
+userPassword: Demo-Passw0rd!
+
+dn: uid=rsaidi,ou=people,dc=exim,dc=local
+objectClass: inetOrgPerson
+uid: rsaidi
+cn: Rehema Saidi
+givenName: Rehema
+sn: Saidi
+mail: rsaidi@exim.local
+telephoneNumber: 2015
+departmentNumber: Communication
+physicalDeliveryOfficeName: Agency-South
+userPassword: Demo-Passw0rd!
+
+dn: uid=kseif,ou=people,dc=exim,dc=local
+objectClass: inetOrgPerson
+uid: kseif
+cn: Khalid Seif
+givenName: Khalid
+sn: Seif
+mail: kseif@exim.local
+telephoneNumber: 2016
+departmentNumber: IT
+physicalDeliveryOfficeName: HQ
+userPassword: Demo-Passw0rd!
+
+dn: uid=ahaji,ou=people,dc=exim,dc=local
+objectClass: inetOrgPerson
+uid: ahaji
+cn: Asha Haji
+givenName: Asha
+sn: Haji
+mail: ahaji@exim.local
+telephoneNumber: 2017
+departmentNumber: HR
+physicalDeliveryOfficeName: Agency-North
+userPassword: Demo-Passw0rd!
+
+dn: uid=bhamisi,ou=people,dc=exim,dc=local
+objectClass: inetOrgPerson
+uid: bhamisi
+cn: Bakari Hamisi
+givenName: Bakari
+sn: Hamisi
+mail: bhamisi@exim.local
+telephoneNumber: 2018
+departmentNumber: Finance
+physicalDeliveryOfficeName: Agency-South
+userPassword: Demo-Passw0rd!
+
+dn: uid=nyoussouf,ou=people,dc=exim,dc=local
+objectClass: inetOrgPerson
+uid: nyoussouf
+cn: Nadia Youssouf
+givenName: Nadia
+sn: Youssouf
+mail: nyoussouf@exim.local
+telephoneNumber: 2019
+departmentNumber: Operations
+physicalDeliveryOfficeName: HQ
+userPassword: Demo-Passw0rd!
+
+dn: uid=sabdou,ou=people,dc=exim,dc=local
+objectClass: inetOrgPerson
+uid: sabdou
+cn: Said Abdou
+givenName: Said
+sn: Abdou
+mail: sabdou@exim.local
+telephoneNumber: 2020
+departmentNumber: Communication
+physicalDeliveryOfficeName: Agency-North
+userPassword: Demo-Passw0rd!
+

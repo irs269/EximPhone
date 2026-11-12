@@ -1,0 +1,5 @@
+.env
+nginx/certs/
+backups/
+node_modules/
+*.log

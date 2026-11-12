@@ -1,0 +1,133 @@
+﻿# EximPhone - base stack. Dev/prod specifics live in the override files.
+# Networks: front (nginx) / back (services) / data (postgres, redis, garage; internal only).
+x-go-service: &go-service
+  restart: unless-stopped
+  networks: [back]
+  environment: &go-env
+    LOG_LEVEL: ${LOG_LEVEL:-info}
+    HTTP_ADDR: ":8080"
+
+services:
+  nginx:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    ports: ["443:443"]
+    volumes:
+      - ./nginx/templates:/etc/nginx/templates:ro
+      - ./nginx/html:/usr/share/nginx/html:ro
+      - ./nginx/certs:/etc/nginx/certs:ro
+    networks: [front, back]
+    depends_on:
+      api: {condition: service_healthy}
+      provisioning: {condition: service_healthy}
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "--no-check-certificate", "https://127.0.0.1/nginx-health"]
+      interval: 10s
+      timeout: 4s
+      retries: 5
+
+  api:
+    <<: *go-service
+    build: {context: ./services, args: {SERVICE: api}}
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+      redis: {condition: service_healthy}
+      garage: {condition: service_healthy}
+    networks: [back, data]
+    environment:
+      <<: *go-env
+      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?sslmode=disable
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
+      JWT_SECRET: ${JWT_SECRET}
+      S3_ENDPOINT: http://garage:3900
+      S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID}
+      S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY}
+
+  sip:
+    <<: *go-service
+    build: {context: ./services, args: {SERVICE: sip}}
+    depends_on: {redis: {condition: service_healthy}}
+    networks: [back, data]
+
+  media:
+    <<: *go-service
+    build: {context: ./services, args: {SERVICE: media}}
+
+  turn:
+    <<: *go-service
+    build: {context: ./services, args: {SERVICE: turn}}
+
+  provisioning:
+    <<: *go-service
+    build: {context: ./services, args: {SERVICE: provisioning}}
+    depends_on: {migrate: {condition: service_completed_successfully}}
+    networks: [back, data]
+
+  worker:
+    <<: *go-service
+    build: {context: ./services, args: {SERVICE: worker}}
+    depends_on: {migrate: {condition: service_completed_successfully}}
+    networks: [back, data]
+
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes: [pgdata:/var/lib/postgresql/data]
+    networks: [data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 4s
+      retries: 10
+
+  migrate:
+    image: migrate/migrate:v4.17.1
+    networks: [data]
+    volumes: [./db/migrations:/migrations:ro]
+    depends_on: {postgres: {condition: service_healthy}}
+    command: ["-path", "/migrations", "-database", "postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?sslmode=disable", "up"]
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--requirepass", "${REDIS_PASSWORD}", "--appendonly", "yes"]
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+    volumes: [redisdata:/data]
+    networks: [data]
+    healthcheck:
+      test: ["CMD-SHELL", "REDISCLI_AUTH=$${REDIS_PASSWORD} redis-cli ping | grep PONG"]
+      interval: 5s
+      timeout: 4s
+      retries: 10
+
+  garage:
+    build: ./ops/garage
+    restart: unless-stopped
+    environment:
+      GARAGE_RPC_SECRET: ${GARAGE_RPC_SECRET}
+      S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID}
+      S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY}
+    volumes: [garagedata:/data]
+    networks: [data]
+    healthcheck:
+      # Healthy only once layout, key and buckets exist.
+      test: ["CMD", "garage", "bucket", "info", "recordings"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 5s
+
+networks:
+  front: {}
+  back: {}
+  data: {internal: true}
+
+volumes:
+  pgdata:
+  redisdata:
+  garagedata:
