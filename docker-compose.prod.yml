@@ -1,0 +1,12 @@
+# Production override. Secrets MUST come from a real .env / Docker secrets, never .env.example.
+# NOTE (phases 4-5): `media` will use network_mode: host (or an explicit UDP range
+# 10000-10200) because RTP needs real source addresses and wide port ranges; Docker NAT breaks it.
+services:
+  nginx:
+    volumes:
+      - certs:/etc/nginx/certs:ro
+  api: {deploy: {resources: {limits: {memory: 512M}}}}
+  sip: {deploy: {resources: {limits: {memory: 512M}}}}
+  media: {deploy: {resources: {limits: {memory: 1G}}}}
+volumes:
+  certs:
