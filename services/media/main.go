@@ -9,10 +9,12 @@ import (
 	"errors"
 	"log"
 	"log/slog"
+	"net"
 	"net/http"
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/irs269/eximphone/services/pkg/server"
 
@@ -64,6 +66,66 @@ func routes(m *manager, jwtSecret []byte, internalToken string) func(chi.Router)
 			_ = json.NewEncoder(w).Encode(map[string]string{"sdp": answer})
 		})
 
+		// --- SIP legs: used by the sip service for desk phones (internal token only) ---
+		internal := func(w http.ResponseWriter, req *http.Request) bool {
+			if subtle.ConstantTimeCompare([]byte(req.Header.Get("X-Internal-Token")), []byte(internalToken)) != 1 {
+				http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
+				return false
+			}
+			return true
+		}
+		r.Post("/legs", func(w http.ResponseWriter, req *http.Request) {
+			if !internal(w, req) {
+				return
+			}
+			var body struct {
+				CallID string `json:"call_id"`
+			}
+			if json.NewDecoder(http.MaxBytesReader(w, req.Body, 1024)).Decode(&body) != nil || body.CallID == "" {
+				http.Error(w, `{"error":"invalid request"}`, http.StatusBadRequest)
+				return
+			}
+			l, err := m.newSIPLeg(body.CallID)
+			if err != nil {
+				http.Error(w, `{"error":"no free port"}`, http.StatusServiceUnavailable)
+				return
+			}
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(map[string]any{"leg_id": l.id, "port": l.port})
+		})
+		r.Post("/legs/{id}/activate", func(w http.ResponseWriter, req *http.Request) {
+			if !internal(w, req) {
+				return
+			}
+			l := m.sipLeg(chi.URLParam(req, "id"))
+			var body struct {
+				Remote string `json:"remote"`
+			}
+			if l == nil || json.NewDecoder(http.MaxBytesReader(w, req.Body, 1024)).Decode(&body) != nil {
+				http.Error(w, `{"error":"unknown leg"}`, http.StatusNotFound)
+				return
+			}
+			addr, err := net.ResolveUDPAddr("udp4", body.Remote)
+			if err != nil {
+				http.Error(w, `{"error":"invalid remote"}`, http.StatusBadRequest)
+				return
+			}
+			if err := l.activate(addr); errors.Is(err, errRoomFull) {
+				http.Error(w, `{"error":"room full"}`, http.StatusConflict)
+				return
+			}
+			w.WriteHeader(http.StatusNoContent)
+		})
+		r.Delete("/legs/{id}", func(w http.ResponseWriter, req *http.Request) {
+			if !internal(w, req) {
+				return
+			}
+			if l := m.sipLeg(chi.URLParam(req, "id")); l != nil {
+				l.close()
+			}
+			w.WriteHeader(http.StatusNoContent)
+		})
+
 		// Called by the api when a call ends.
 		r.Delete("/calls/{id}", func(w http.ResponseWriter, req *http.Request) {
 			if subtle.ConstantTimeCompare([]byte(req.Header.Get("X-Internal-Token")), []byte(internalToken)) != 1 {
@@ -90,7 +152,16 @@ func main() {
 		log.Fatal(err)
 	}
 	server.RunWith("media", routes(m, []byte(secret), os.Getenv("INTERNAL_TOKEN")), func(ctx context.Context, l *slog.Logger) {
-		<-ctx.Done()
+		t := time.NewTicker(30 * time.Second)
+		defer t.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-t.C:
+				m.gc(2 * time.Minute)
+			}
+		}
 	})
 }
 

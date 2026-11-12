@@ -1,7 +1,7 @@
 DC_DEV  = docker compose -f docker-compose.yml -f docker-compose.dev.yml
 DC_PROD = docker compose -f docker-compose.yml -f docker-compose.prod.yml
 
-.PHONY: dev up down logs migrate seed test e2e certs backup
+.PHONY: dev up down logs migrate seed test e2e e2e-phones certs backup
 
 .env:
 	cp .env.example .env
@@ -31,11 +31,14 @@ e2e: ## Chat, presence and call signaling acceptance tests (needs make dev; loca
 	NODE_TLS_REJECT_UNAUTHORIZED=0 node tests/e2e/realtime.mjs https://127.0.0.1
 	NODE_TLS_REJECT_UNAUTHORIZED=0 node tests/e2e/calls.mjs https://127.0.0.1
 
+e2e-phones: ## Desk phone integration test (SIP softphone + WebRTC client; needs make dev)
+	sh scripts/e2e-phones.sh
+
 certs: ## Self-signed dev certificate (nginx/certs)
 	@if [ ! -f nginx/certs/server.crt ]; then mkdir -p nginx/certs && \
 	docker run --rm -v "$(CURDIR)/nginx/certs:/certs" alpine/openssl req -x509 -nodes -newkey rsa:2048 -days 365 \
 	  -keyout /certs/server.key -out /certs/server.crt -subj "/CN=eximphone.local" \
-	  -addext "subjectAltName=DNS:localhost,DNS:eximphone.local,IP:127.0.0.1"; fi
+	  -addext "subjectAltName=DNS:localhost,DNS:eximphone.local,IP:127.0.0.1" && 	docker run --rm --entrypoint chmod -v "$(CURDIR)/nginx/certs:/certs" alpine/openssl 644 /certs/server.key; fi
 
 backup:
 	@mkdir -p backups

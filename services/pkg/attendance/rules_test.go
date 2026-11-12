@@ -35,7 +35,7 @@ func TestDepartureStatus(t *testing.T) {
 }
 
 func TestWorkDateUsesSiteTimezone(t *testing.T) {
-	loc, _ := time.LoadLocation("Africa/Dar_es_Salaam") // UTC+3
+	loc, _ := time.LoadLocation("Africa/Dar_es_Salaam")    // UTC+3
 	utc := time.Date(2026, 11, 12, 22, 30, 0, 0, time.UTC) // 01:30 on the 13th locally
 	if got := WorkDate(utc, loc).Day(); got != 13 {
 		t.Fatalf("day = %d, want 13", got)

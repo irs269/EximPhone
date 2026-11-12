@@ -126,7 +126,15 @@ export const useCalls = create<CallsState>((set, get) => {
             remoteHeld: false, transferredBy: data.transferred_by } });
           break;
         case 'call_answered':
-          if (c && c.id === data.call_id) { patch({ mode: 'live', answeredAt: Date.now() }); void connectMedia(c.id); }
+          if (!c || c.id !== data.call_id) break;
+          if (data.via === 'sip' && c.direction === 'in') {
+            // another device of ours (the desk phone) took the call: stop ringing here
+            set({ call: null, transferOpen: false });
+            toast('Appel pris sur votre poste de bureau.');
+            break;
+          }
+          patch({ mode: 'live', answeredAt: Date.now() });
+          void connectMedia(c.id);
           break;
         case 'call_hold':
           if (c && c.id === data.call_id) patch({ remoteHeld: !!data.on });

@@ -65,7 +65,7 @@ export function Phone() {
         <div>
           <div className="card">
             <h4>Mes appareils <span className="pill">Synchronisés</span></h4>
-            <Device k="desk" icon="desk" title="Poste de bureau" sub="Téléphone IP (SIP) · disponible en phase 5" />
+            <Device k="desk" icon="desk" title="Poste de bureau" sub="Téléphone IP (SIP) · sonne en même temps que le PC" />
             <Device k="pc" icon="pc" title="Application PC" sub="EximPhone Desktop v0.1 · audio WebRTC" />
             <div style={{ fontSize: 12, color: 'var(--muted)', lineHeight: 1.5 }}>Les appels vers le <b>{ext}</b> sonnent sur tous les appareils actifs. Décrochez sur l'un, les autres s'arrêtent.</div>
           </div>

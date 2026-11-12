@@ -11,6 +11,8 @@ function Ensure-Certs {
   docker run --rm -v "${PWD}/nginx/certs:/certs" alpine/openssl req -x509 -nodes -newkey rsa:2048 -days 365 `
     -keyout /certs/server.key -out /certs/server.crt -subj "/CN=eximphone.local" `
     -addext "subjectAltName=DNS:localhost,DNS:eximphone.local,IP:127.0.0.1"
+  # dev only: the services run as a non-root user and must be able to read the key
+  docker run --rm --entrypoint chmod -v "${PWD}/nginx/certs:/certs" alpine/openssl 644 /certs/server.key
 }
 
 switch ($Target) {
