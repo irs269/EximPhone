@@ -8,6 +8,8 @@ const defs: Record<string, [Style, ReactNode]> = {
   clock: ['stroke', <><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></>],
   ann: ['stroke', <path d="M3 11l18-8v18L3 13zM7 12.5V19a2 2 0 0 0 4 0v-4.7" />],
   logout: ['stroke', <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" />],
+  chart: ['stroke', <path d="M4 20V10M10 20V4M16 20v-8M22 20H2" />],
+  shield: ['stroke', <path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z" />],
   call: ['fill', <path d="M6.6 10.8a15.1 15.1 0 0 0 6.6 6.6l2.2-2.2a1 1 0 0 1 1-.25 11.4 11.4 0 0 0 3.6.57 1 1 0 0 1 1 1V20a1 1 0 0 1-1 1A17 17 0 0 1 3 4a1 1 0 0 1 1-1h3.5a1 1 0 0 1 1 1c0 1.25.2 2.45.57 3.57a1 1 0 0 1-.25 1z" />],
   send: ['fill', <path d="M2 21l21-9L2 3v7l15 2-15 2z" />],
   desk: ['stroke', <><rect x="3" y="4" width="18" height="16" rx="2" /><path d="M7 4v16M11 8h6M11 12h2M15 12h2M11 16h2M15 16h2" /></>],

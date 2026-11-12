@@ -110,7 +110,59 @@ export async function mediaOffer(callId: string, mediaJwt: string, sdp: string):
   return body.sdp as string;
 }
 
-export const me = () => request<{ user: User; attendance: Day | null }>('/me');
+export const me = () => request<{ user: User; attendance: Day | null; roles: string[] }>('/me');
+
+// ---- announcements ----
+export interface AnnouncementItem {
+  id: number; title: string; body: string; level: 'normal' | 'urgent'; author: string; created_at: string;
+  target_kind: string; target_name: string; acked_at: string | null;
+}
+export interface AckPerson { id: number; display_name: string; department: string; site: string; acked_at: string | null }
+export interface OrgMeta { departments: { id: number; name: string }[]; sites: { id: number; name: string }[] }
+
+export const announcements = () => request<{ announcements: AnnouncementItem[] }>('/announcements');
+export const ackAnnouncement = (id: number) => request<unknown>(`/announcements/${id}/ack`, { method: 'POST' });
+export const announcementAcks = (id: number) =>
+  request<{ total: number; read: AckPerson[]; unread: AckPerson[] }>(`/announcements/${id}/acks`);
+export const publishAnnouncement = (b: { title: string; body: string; level: string; target: { kind: string; id?: number } }) =>
+  request<{ id: number; recipients: number }>('/announcements', { method: 'POST', body: JSON.stringify(b) });
+export const orgMeta = () => request<OrgMeta>('/meta/org');
+
+// ---- HR / managers ----
+export interface OverviewRow {
+  user_id: number; display_name: string; department: string; site: string; status: 'present' | 'late' | 'absent';
+  day_id?: number; clock_in?: string; clock_out?: string; departure?: string;
+}
+export interface Bucket { name: string; present: number; late: number; absent: number }
+export interface Overview { date: string; weekend: boolean; totals: Bucket; by_site: Bucket[]; by_department: Bucket[]; rows: OverviewRow[] }
+export interface DayRow {
+  id: number; user_id: number; display_name: string; username: string; department: string; site: string; work_date: string;
+  clock_in: string; clock_out: string | null; arrival: string; departure: string; duration_min: number | null;
+  early_reason: string; early_validation: string; validation_comment: string;
+}
+export const hrOverview = (date = '') => request<Overview>('/hr/overview' + (date ? '?date=' + date : ''));
+export const hrAttendance = (qs: Record<string, string>) =>
+  request<{ days: DayRow[] }>('/hr/attendance?' + new URLSearchParams(Object.entries(qs).filter(([, v]) => v)).toString());
+export const hrEarly = () => request<{ days: DayRow[] }>('/hr/early-departures');
+export const hrValidate = (id: number, approved: boolean, comment: string) =>
+  request<unknown>(`/hr/attendance/${id}/validate`, { method: 'POST', body: JSON.stringify({ approved, comment }) });
+export const hrCorrect = (id: number, b: { clock_in?: string; clock_out?: string; justification: string }) =>
+  request<unknown>(`/hr/attendance/${id}/correct`, { method: 'POST', body: JSON.stringify(b) });
+
+/** Downloads the monthly payroll export (auth header required, so through fetch) and saves it. */
+export async function downloadExport(month: string, format: 'csv' | 'xlsx'): Promise<void> {
+  const res = await fetch(`/api/hr/export?month=${month}&format=${format}`, { headers: { Authorization: `Bearer ${token}` }, credentials: 'same-origin' });
+  if (!res.ok) throw new ApiError(res.status, 'export failed');
+  const url = URL.createObjectURL(await res.blob());
+  const a = document.createElement('a');
+  a.href = url; a.download = `pointages-${month}.${format}`; a.click();
+  window.setTimeout(() => URL.revokeObjectURL(url), 5000);
+}
+
+// ---- audit ----
+export interface AuditEntry { id: number; at: string; actor: string; action: string; ip: string; details: Record<string, unknown> }
+export const auditLog = (qs: Record<string, string>) =>
+  request<{ entries: AuditEntry[] }>('/audit?' + new URLSearchParams(Object.entries(qs).filter(([, v]) => v)).toString());
 export const history = () => request<{ days: Day[] }>('/me/attendance');
 export const logoutSummary = () => request<LogoutSummary>('/auth/logout-summary');
 export const logout = async (reason: string) => {
