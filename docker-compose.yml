@@ -39,6 +39,7 @@ services:
       DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?sslmode=disable
       REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
       JWT_SECRET: ${JWT_SECRET}
+      MESSAGE_KEY: ${MESSAGE_KEY}
       LDAP_URL: ${LDAP_URL}
       LDAP_BASE_DN: ${LDAP_BASE_DN}
       LDAP_USER_ATTR: ${LDAP_USER_ATTR}
@@ -71,11 +72,17 @@ services:
   worker:
     <<: *go-service
     build: {context: ./services, args: {SERVICE: worker}}
-    depends_on: {migrate: {condition: service_completed_successfully}}
+    depends_on: {migrate: {condition: service_completed_successfully}, redis: {condition: service_healthy}}
     networks: [back, data]
     environment:
       <<: *go-env
       DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?sslmode=disable
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
+      LDAP_URL: ${LDAP_URL}
+      LDAP_BASE_DN: ${LDAP_BASE_DN}
+      LDAP_USER_ATTR: ${LDAP_USER_ATTR}
+      LDAP_BIND_DN: ${LDAP_BIND_DN}
+      LDAP_BIND_PASSWORD: ${LDAP_BIND_PASSWORD}
 
   postgres:
     image: postgres:16-alpine

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/irs269/eximphone/services/pkg/attendance"
+	"github.com/irs269/eximphone/services/pkg/directory"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -51,7 +52,7 @@ func scanDay(r pgx.Row) (*day, error) {
 }
 
 // upsertUser syncs the directory profile into users and returns the local record.
-func (s store) upsertUser(ctx context.Context, p *Profile) (*user, error) {
+func (s store) upsertUser(ctx context.Context, p *directory.Profile) (*user, error) {
 	var u user
 	err := s.db.QueryRow(ctx, `
 		INSERT INTO users (username, display_name, email, extension, department_id, site_id)

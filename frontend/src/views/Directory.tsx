@@ -1,31 +1,39 @@
 import { useApp } from '../store/app';
+import { useChat } from '../store/chat';
 import { t } from '../i18n';
 import { Icon } from '../components/Icon';
-import { Avatar, lineLabel } from '../components/Avatar';
-import { people } from '../data/mock';
+import { UserAvatar, toPerson } from '../components/Avatar';
+
+const label: Record<string, string> = {
+  on: 'status.on', busy: 'status.busy', meet: 'status.meet', away: 'status.away', dnd: 'status.dnd',
+};
 
 export function Directory() {
-  const { cur, startCall, messageTo } = useApp();
-  const p = people.find((x) => 'p' + x.id === cur) ?? people[0];
+  const { cur, startCall, setView } = useApp();
+  const { users, presence, startDirect } = useChat();
+  const list = Object.values(users);
+  const u = users[Number(cur.slice(1))] ?? list[0];
+  if (!u) return <div className="empty">{t('list.none')}</div>;
+  const st = presence[u.id];
+
   return (
     <>
-      <div className="mock" role="note">{t('mock.banner')}</div>
-      <div className="top"><div className="tt"><b>Annuaire Exim Bank</b><span>{people.length} collaborateurs · synchronisé avec Active Directory</span></div></div>
+      <div className="top"><div className="tt"><b>Annuaire Exim Bank</b><span>{list.length} collaborateurs · synchronisé avec Active Directory</span></div></div>
       <div className="prof">
         <div className="pc">
           <div className="cv" />
-          <Avatar p={p} big />
-          <div className="info"><b>{p.name}</b><span>{p.role}</span></div>
+          <UserAvatar u={u} status={st} big />
+          <div className="info"><b>{u.display_name}</b><span>{u.department}</span></div>
           <div className="acts">
-            <button className="btn" onClick={() => startCall(p)}><Icon name="call" /> Appeler</button>
-            <button className="btn gold" onClick={() => messageTo(p.id)}><Icon name="chat" /> Message</button>
+            {u.extension && <button className="btn" onClick={() => startCall(toPerson(u))}><Icon name="call" /> Appeler</button>}
+            <button className="btn gold" onClick={async () => { await startDirect(u.id); setView('chat'); }}><Icon name="chat" /> Message</button>
           </div>
           <div className="rows">
-            <div><span>Poste interne</span><b>{p.ext}</b></div>
-            <div><span>Département</span>{p.dept}</div>
-            <div><span>Site</span>{p.site}</div>
-            <div><span>Statut</span>{lineLabel[p.line]}</div>
-            <div><span>E-mail</span>{p.name.toLowerCase().replace(' ', '.')}@eximbank.co.tz</div>
+            <div><span>Poste interne</span><b>{u.extension}</b></div>
+            <div><span>Département</span>{u.department}</div>
+            <div><span>Site</span>{u.site}</div>
+            <div><span>Statut</span>{st && label[st] ? t(label[st] as 'status.on') : t('chat.offline')}</div>
+            <div><span>E-mail</span>{u.email}</div>
           </div>
         </div>
       </div>

@@ -16,9 +16,12 @@ import (
 	"time"
 
 	"github.com/irs269/eximphone/services/pkg/attendance"
+	"github.com/irs269/eximphone/services/pkg/crypto"
+	"github.com/irs269/eximphone/services/pkg/directory"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/minio/minio-go/v7"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -35,7 +38,10 @@ type ctxKey struct{}
 type app struct {
 	st        store
 	rdb       *redis.Client
-	ldap      ldapClient
+	ldap      directory.Client
+	hub       *hub
+	box       *crypto.Box
+	s3        *minio.Client
 	jwtSecret []byte
 	now       func() time.Time
 }
@@ -43,8 +49,10 @@ type app struct {
 func (a *app) routes(r chi.Router) {
 	r.Post("/auth/login", a.login)
 	r.Post("/auth/refresh", a.refresh)
+	r.Get("/ws", a.serveWS)
 	r.Group(func(r chi.Router) {
 		r.Use(a.requireSession)
+		a.chatRoutes(r)
 		r.Get("/me", a.me)
 		r.Get("/me/attendance", a.history)
 		r.Get("/auth/logout-summary", a.logoutSummary)
@@ -171,7 +179,7 @@ func (a *app) login(w http.ResponseWriter, r *http.Request) {
 	}
 
 	prof, err := a.ldap.Authenticate(req.Username, req.Password)
-	if errors.Is(err, errInvalidCredentials) {
+	if errors.Is(err, directory.ErrInvalidCredentials) {
 		if a.rdb.Incr(ctx, rlKey).Val() == 1 {
 			a.rdb.Expire(ctx, rlKey, loginWindow)
 		}
@@ -220,6 +228,9 @@ func (a *app) login(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		apiError(w, http.StatusInternalServerError, "internal error")
 		return
+	}
+	if a.rdb.HSetNX(ctx, "presence", strconv.FormatInt(u.ID, 10), "on").Val() {
+		a.hub.publish(ctx, nil, "presence", map[string]any{"user_id": u.ID, "status": "on"})
 	}
 	a.st.audit(ctx, &u.ID, u.Username, "login", ip, map[string]any{"new_clock_in": created, "arrival": d.Arrival})
 	writeJSON(w, http.StatusOK, map[string]any{"access_token": access, "user": u, "attendance": d, "new_clock_in": created})
@@ -320,6 +331,8 @@ func (a *app) logout(w http.ResponseWriter, r *http.Request) {
 		a.rdb.Del(ctx, hashToken(c.Value))
 	}
 	clearRefresh(w)
+	a.setPresence(ctx, u.ID, "offline")
+	a.hub.publish(ctx, []int64{u.ID}, "kick", struct{}{}) // close every open socket of this user
 	a.st.audit(ctx, &u.ID, u.Username, "logout", clientIP(r), map[string]any{"departure": dep, "duration_min": mins})
 	writeJSON(w, http.StatusOK, map[string]any{"clock_in": d.ClockIn, "clock_out": now, "duration_min": mins, "departure": dep})
 }

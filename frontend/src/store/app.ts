@@ -2,9 +2,10 @@ import { create } from 'zustand';
 import * as api from '../api/client';
 import { ApiError, type Day, type LogoutSummary, type User } from '../api/client';
 import { t } from '../i18n';
+import { useChat } from './chat';
 import {
-  initialAnnouncements, initialCalls, initialChats, person,
-  type Announcement, type CallLog, type Chat, type Person, type Presence,
+  initialAnnouncements, initialCalls, person,
+  type Announcement, type CallLog, type Person, type Presence,
 } from '../data/mock';
 
 export type View = 'chat' | 'phone' | 'dir' | 'att' | 'ann';
@@ -35,7 +36,6 @@ interface State {
   statusMenu: boolean;
   toast: string;
   devs: { desk: boolean; pc: boolean };
-  chats: Chat[];
   calls: CallLog[];
   anns: Announcement[];
   call: Call | null;
@@ -46,9 +46,6 @@ interface State {
   toggleStatusMenu: (open?: boolean) => void;
   showToast: (m: string) => void;
   toggleDev: (k: 'desk' | 'pc') => void;
-  openChat: (id: string) => void;
-  messageTo: (personId: number) => void;
-  send: (chatId: string, text: string) => void;
   ack: (id: number) => void;
   startCall: (p: Person) => void;
   incoming: () => void;
@@ -77,6 +74,7 @@ export const useApp = create<State>((set, get) => ({
       if (await api.refresh()) {
         const r = await api.me();
         set({ phase: 'in', user: r.user, today: r.attendance, presence: 'on' });
+        useChat.getState().start(r.user.id);
         return;
       }
     } catch { /* fall through to login */ }
@@ -87,8 +85,9 @@ export const useApp = create<State>((set, get) => ({
     set({ loginError: '' });
     try {
       const r = await api.login(username, password);
-      set({ phase: 'in', user: r.user, today: r.attendance, presence: 'on', view: 'chat', cur: 'c1',
+      set({ phase: 'in', user: r.user, today: r.attendance, presence: 'on', view: 'chat',
         dialog: { kind: 'arrival', resumed: !r.new_clock_in } });
+      useChat.getState().start(r.user.id);
     } catch (e) {
       set({ loginError: loginMessage(e) });
     }
@@ -106,6 +105,7 @@ export const useApp = create<State>((set, get) => ({
     try {
       const name = get().user?.display_name.split(' ')[0] ?? '';
       const r = await api.logout(reason);
+      useChat.getState().stop();
       set({ phase: 'out', user: null, today: null, call: null,
         dialog: { kind: 'bye', time: r.clock_out, durationMin: r.duration_min, name } });
       return null;
@@ -115,18 +115,19 @@ export const useApp = create<State>((set, get) => ({
   },
   closeDialog: () => set({ dialog: null }),
 
-  view: 'chat', cur: 'c1', query: '', presence: 'on', statusMenu: false, toast: '',
+  view: 'chat', cur: '', query: '', presence: 'on', statusMenu: false, toast: '',
   devs: { desk: true, pc: true },
-  chats: initialChats(), calls: initialCalls(), anns: initialAnnouncements(), call: null,
+  calls: initialCalls(), anns: initialAnnouncements(), call: null,
 
   setView(v) {
-    const cur = v === 'dir' && !get().cur.startsWith('p') ? 'p1' : v === 'chat' && !get().cur.startsWith('c') ? 'c1' : get().cur;
-    set({ view: v, query: '', cur });
+    set({ view: v, query: '' });
   },
   setCur: (cur) => set({ cur }),
   setQuery: (query) => set({ query }),
   setPresence(p) {
     set({ presence: p, statusMenu: false });
+    void api.putPresence(p);
+    useChat.setState((c) => ({ presence: { ...c.presence, [c.me]: p } }));
     get().showToast(t('toast.status', { s: t(`status.${p}`) }));
   },
   toggleStatusMenu: (open) => set((s) => ({ statusMenu: open ?? !s.statusMenu })),
@@ -136,29 +137,6 @@ export const useApp = create<State>((set, get) => ({
   },
   toggleDev: (k) => set((s) => ({ devs: { ...s.devs, [k]: !s.devs[k] } })),
 
-  openChat(id) {
-    set((s) => ({ view: 'chat', cur: id, chats: s.chats.map((c) => (c.id === id ? { ...c, unread: 0 } : c)) }));
-  },
-  messageTo(personId) {
-    let chat = get().chats.find((c) => c.person === personId);
-    if (!chat) {
-      chat = { id: 'c' + Date.now(), person: personId, unread: 0, msgs: [] };
-      set((s) => ({ chats: [chat!, ...s.chats] }));
-    }
-    get().openChat(chat.id);
-  },
-  send(chatId, text) {
-    const push = (from: 'me' | 'them' | number, body: string) =>
-      set((s) => ({ chats: s.chats.map((c) => (c.id === chatId
-        ? { ...c, unread: from === 'me' || (get().view === 'chat' && get().cur === chatId) ? 0 : c.unread + 1,
-            msgs: [...c.msgs, { from, text: body, time: nowHM() }] } : c)) }));
-    push('me', text);
-    const replies = ['Bien reçu, merci !', "D'accord, je regarde ça tout de suite.", 'Parfait, on en parle au téléphone ?', 'Merci, c\'est noté 👍'];
-    window.setTimeout(() => {
-      const c = get().chats.find((x) => x.id === chatId);
-      push(c?.group ? (c.members?.[0] ?? 'them') : 'them', replies[Math.floor(Math.random() * replies.length)]);
-    }, 2400);
-  },
   ack: (id) => set((s) => ({ anns: s.anns.map((a) => (a.id === id ? { ...a, ack: true } : a)) })),
 
   startCall(p) {

@@ -4,7 +4,9 @@ Internal communication and attendance platform for Exim Bank. Full spec: [docs/P
 
 ## Status
 
-Phase 0 (foundation) done. Phase 1 (auth + attendance API) done: LDAP login = clock-in, network check, late/early rules, logout = clock-out, midnight auto-close by the worker. Phase 2 (frontend + brand) done: React app faithful to the prototype, design tokens, French UI with i18n catalogs, Electron shell. Login and Presence use the real API; Messages, Calls, Directory and Announcements are mock data until phases 3-6.
+Phase 0 (foundation) done. Phase 1 (auth + attendance API) done: LDAP login = clock-in, network check, late/early rules, logout = clock-out, midnight auto-close by the worker. Phase 2 (frontend + brand) done: React app faithful to the prototype, design tokens, French UI with i18n catalogs, Electron shell. Login and Presence use the real API; Calls and Announcements are mock data until phases 4-6.
+
+Phase 3 (presence + chat) done: realtime presence and messaging over WebSocket + Redis pub/sub, direct and group conversations, receipts (sent/delivered/read), typing indicator, attachments (PDF/PNG/JPEG, 20 MB, MIME-sniffed) in Garage, messages AES-256-GCM encrypted at rest, logical deletion only, nightly LDAP directory sync. Acceptance test: `make e2e` (22 checks; presence propagates in under 100 ms locally).
 
 Try it (dev): `POST https://localhost/api/auth/login` with `{"username":"asaid","password":"Demo-Passw0rd!"}`. Rules: [docs/attendance-rules.md](docs/attendance-rules.md).
 

@@ -1,7 +1,7 @@
 DC_DEV  = docker compose -f docker-compose.yml -f docker-compose.dev.yml
 DC_PROD = docker compose -f docker-compose.yml -f docker-compose.prod.yml
 
-.PHONY: dev up down logs migrate seed test certs backup
+.PHONY: dev up down logs migrate seed test e2e certs backup
 
 .env:
 	cp .env.example .env
@@ -26,6 +26,9 @@ seed: ## Apply db/seed/*.sql (LDAP demo users are loaded automatically by ldap-m
 
 test:
 	docker run --rm -v "$(CURDIR)/services:/src" -w /src golang:1.23-alpine go test ./...
+
+e2e: ## Realtime chat/presence acceptance test (needs make dev; local self-signed cert only)
+	NODE_TLS_REJECT_UNAUTHORIZED=0 node tests/e2e/realtime.mjs
 
 certs: ## Self-signed dev certificate (nginx/certs)
 	@if [ ! -f nginx/certs/server.crt ]; then mkdir -p nginx/certs && \
