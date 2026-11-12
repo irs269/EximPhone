@@ -1,11 +1,13 @@
 import { useQuery } from '@tanstack/react-query';
-import { useEffect } from 'react';
-import { history } from '../api/client';
+import { useEffect, useState } from 'react';
+import { history, searchMessages, type Message } from '../api/client';
+import { convTitle, useChat } from '../store/chat';
+import { NewChatDialog } from './NewChatDialog';
 import { useApp, type View } from '../store/app';
 import { t } from '../i18n';
 import { Icon, type IconName } from './Icon';
-import { Avatar, GroupAvatar, presenceColor } from './Avatar';
-import { person, people, type Presence } from '../data/mock';
+import { Avatar, GroupAvatar, UserAvatar, presenceColor } from './Avatar';
+import { person, type Presence } from '../data/mock';
 import { hm, durMin, initials } from '../lib';
 import { Chat as ChatView } from '../views/Chat';
 import { Phone } from '../views/Phone';
@@ -24,8 +26,8 @@ const nav: { v: View; icon: IconName; label: Parameters<typeof t>[0] }[] = [
 ];
 
 function Rail() {
-  const { view, setView, askLogout, user, presence, toggleStatusMenu, chats, anns } = useApp();
-  const unread = chats.reduce((n, c) => n + c.unread, 0);
+  const { view, setView, askLogout, user, presence, toggleStatusMenu, anns } = useApp();
+  const unread = useChat((c) => c.convs.reduce((n, x) => n + x.unread, 0));
   const pendingAnn = anns.filter((a) => !a.ack).length;
   const badge = (v: View) => (v === 'chat' ? unread : v === 'ann' ? pendingAnn : 0);
   return (
@@ -73,22 +75,37 @@ function ListPane() {
   const s = useApp();
   const q = s.query.toLowerCase();
   const titles: Record<View, Parameters<typeof t>[0]> = { chat: 'nav.messages', phone: 'nav.calls', dir: 'nav.directory', att: 'nav.attendance', ann: 'nav.announcements' };
+  const chat = useChat();
+  const [hits, setHits] = useState<Message[]>([]);
+  useEffect(() => {
+    if (s.view !== 'chat' || q.length < 2) { setHits([]); return; }
+    const id = window.setTimeout(() => { void searchMessages(q).then((r) => setHits(r.results)).catch(() => setHits([])); }, 300);
+    return () => window.clearTimeout(id);
+  }, [q, s.view]);
   const days = useQuery({ queryKey: ['history'], queryFn: history, enabled: s.view === 'att' });
   let items: React.ReactNode[] = [];
 
   if (s.view === 'chat') {
-    items = s.chats.filter((c) => (c.group ?? person(c.person!).name).toLowerCase().includes(q)).map((c) => {
-      const p = c.person ? person(c.person) : null;
-      const last = c.msgs[c.msgs.length - 1];
-      return (
-        <button key={c.id} className={'it' + (s.cur === c.id ? ' on' : '')} onClick={() => s.openChat(c.id)}>
-          {p ? <Avatar p={p} /> : <GroupAvatar />}
-          <div className="t"><div className="n">{c.group ?? p!.name}<small>{last?.time}</small></div>
-            <div className="s">{last?.from === 'me' ? 'Vous : ' : ''}{last?.text}</div></div>
-          {c.unread > 0 && <span className="cnt">{c.unread}</span>}
-        </button>
-      );
-    });
+    items = [
+      <button key="new" className="btn gold newbtn" onClick={() => chat.setNewChat(true)}>+ {t('chat.new')}</button>,
+      ...chat.convs.filter((c) => convTitle(c, chat.users, chat.me).toLowerCase().includes(q)).map((c) => {
+        const title = convTitle(c, chat.users, chat.me);
+        const other = c.kind === 'direct' ? chat.users[c.members.find((id) => id !== chat.me) ?? 0] : undefined;
+        const last = c.last_message;
+        return (
+          <button key={c.id} className={'it' + (chat.active === c.id ? ' on' : '')} onClick={() => void chat.openConv(c.id)}>
+            {other ? <UserAvatar u={other} status={chat.presence[other.id]} /> : <GroupAvatar />}
+            <div className="t"><div className="n">{title}<small>{last ? hm(last.created_at) : ''}</small></div>
+              <div className="s">{last ? (last.sender_id === chat.me ? t('chat.you') : '') + (last.deleted ? t('chat.deleted') : last.body || last.attachment?.filename || '') : ''}</div></div>
+            {c.unread > 0 && <span className="cnt">{c.unread}</span>}
+          </button>
+        );
+      }),
+      ...(hits.length ? [<div className="sec" key="res">{t('chat.results')}</div>, ...hits.map((m) => (
+        <button key={'r' + m.id} className="it" onClick={() => void chat.openConv(m.conversation_id)}>
+          <div className="t"><div className="n">{chat.users[m.sender_id]?.display_name ?? ''}<small>{hm(m.created_at)}</small></div><div className="s">{m.body}</div></div>
+        </button>))] : []),
+    ];
   } else if (s.view === 'phone') {
     items = [<div className="sec" key="h">{t('list.recent')}</div>, ...s.calls.filter((c) => person(c.person).name.toLowerCase().includes(q)).map((c, i) => {
       const p = person(c.person);
@@ -101,12 +118,13 @@ function ListPane() {
       );
     })];
   } else if (s.view === 'dir') {
-    const depts = [...new Set(people.map((p) => p.dept))];
+    const all = Object.values(chat.users);
+    const depts = [...new Set(all.map((u) => u.department))].sort();
     items = depts.flatMap((d) => {
-      const ps = people.filter((p) => p.dept === d && (p.name + p.role + p.ext + p.site).toLowerCase().includes(q));
-      return ps.length ? [<div className="sec" key={d}>{d}</div>, ...ps.map((p) => (
-        <button key={p.id} className={'it' + (s.cur === 'p' + p.id ? ' on' : '')} onClick={() => s.setCur('p' + p.id)}>
-          <Avatar p={p} /><div className="t"><div className="n">{p.name}<small>{p.ext}</small></div><div className="s">{p.role}</div></div>
+      const us = all.filter((u) => u.department === d && (u.display_name + u.department + u.extension + u.site).toLowerCase().includes(q));
+      return us.length ? [<div className="sec" key={d}>{d}</div>, ...us.map((u) => (
+        <button key={u.id} className={'it' + (s.cur === 'u' + u.id ? ' on' : '')} onClick={() => s.setCur('u' + u.id)}>
+          <UserAvatar u={u} status={chat.presence[u.id]} /><div className="t"><div className="n">{u.display_name}<small>{u.extension}</small></div><div className="s">{u.site}</div></div>
         </button>))] : [];
     });
   } else if (s.view === 'ann') {
@@ -165,6 +183,7 @@ export function Shell() {
       </div>
       <StatusMenu />
       <CallOverlay />
+      <NewChatDialog />
       <Dialogs />
       <div id="toast" className={toast ? 'show' : ''} role="status" aria-live="polite">{toast}</div>
     </>

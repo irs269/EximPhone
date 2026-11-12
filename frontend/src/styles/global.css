@@ -187,3 +187,15 @@ button.it{width:100%;text-align:left;font:inherit;color:inherit}
 .stchip,.sw{border:0}
 .sw{cursor:pointer}
 .rail .lo{margin-top:auto}
+.m.del{opacity:.6}
+.tick{margin-left:4px}.tick.read{color:var(--ok)}
+.msg-del{margin-left:6px;opacity:.5;font-size:13px;line-height:1}.msg-del:hover{opacity:1}
+.att-box{margin-bottom:6px}.att-img{display:block;max-width:240px;max-height:200px;border-radius:8px;margin-bottom:6px}
+.att-file{display:block;text-align:left;background:var(--white-soft);border-radius:8px;padding:8px 10px;width:100%}
+.m:not(.me) .att-file{background:var(--bg)}
+.att-file small{display:block;opacity:.7;margin-top:2px}
+.picker{max-height:260px;overflow:auto;border:1px solid var(--line);border-radius:8px;margin-top:8px;text-align:left}
+.picker label{display:flex;gap:10px;align-items:center;text-transform:none;letter-spacing:0;font-size:14px;color:var(--text);margin:0;padding:8px 12px;cursor:pointer}
+.picker label:hover{background:var(--hover)}
+.newbtn{margin:10px 18px 0;width:calc(100% - 36px)}
+.dbox .form{padding:20px 26px;text-align:left}

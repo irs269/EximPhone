@@ -40,6 +40,48 @@ export const login = async (username: string, password: string) => {
   token = r.access_token;
   return r;
 };
+export const getToken = () => token;
+
+// ---- directory, presence, chat ----
+export interface DirUser { id: number; username: string; display_name: string; extension: string; department: string; site: string; email: string }
+export interface Attachment { id: string; filename: string; mime: string; size: number }
+export interface Message {
+  id: number; conversation_id: number; sender_id: number; body: string; created_at: string;
+  deleted?: boolean; status?: 'sent' | 'delivered' | 'read'; attachment?: Attachment;
+}
+export interface Conversation { id: number; kind: 'direct' | 'group'; name?: string; members: number[]; unread: number; last_message?: Message }
+
+export const users = (q = '') => request<{ users: DirUser[] }>('/users?q=' + encodeURIComponent(q));
+export const getPresence = () => request<{ presence: Record<string, string> }>('/presence');
+export const putPresence = (status: string) => request<{ status: string }>('/presence', { method: 'PUT', body: JSON.stringify({ status }) });
+export const conversations = () => request<{ conversations: Conversation[] }>('/conversations');
+export const createConversation = (member_ids: number[], name?: string) =>
+  request<Conversation>('/conversations', { method: 'POST', body: JSON.stringify({ member_ids, name }) });
+export const messages = (conv: number, before = 0) =>
+  request<{ messages: Message[]; has_more: boolean }>(`/conversations/${conv}/messages?limit=50${before ? '&before=' + before : ''}`);
+export const sendMessage = (conv: number, body: string, attachment_id?: string) =>
+  request<Message>(`/conversations/${conv}/messages`, { method: 'POST', body: JSON.stringify({ body, attachment_id }) });
+export const markRead = (conv: number) => request<unknown>(`/conversations/${conv}/read`, { method: 'POST' });
+export const deleteMessage = (id: number) => request<unknown>(`/messages/${id}`, { method: 'DELETE' });
+export const searchMessages = (q: string) => request<{ results: Message[] }>('/search?q=' + encodeURIComponent(q));
+
+export async function uploadAttachment(conv: number, file: File): Promise<Attachment> {
+  const form = new FormData();
+  form.set('conversation_id', String(conv));
+  form.set('file', file);
+  const res = await fetch('/api/attachments', { method: 'POST', body: form, headers: { Authorization: `Bearer ${token}` }, credentials: 'same-origin' });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new ApiError(res.status, body.error ?? res.statusText);
+  return body as Attachment;
+}
+
+/** Downloads an attachment (auth header required, so we go through fetch) and returns an object URL. */
+export async function attachmentUrl(id: string): Promise<string> {
+  const res = await fetch('/api/attachments/' + id, { headers: { Authorization: `Bearer ${token}` }, credentials: 'same-origin' });
+  if (!res.ok) throw new ApiError(res.status, 'download failed');
+  return URL.createObjectURL(await res.blob());
+}
+
 export const me = () => request<{ user: User; attendance: Day | null }>('/me');
 export const history = () => request<{ days: Day[] }>('/me/attendance');
 export const logoutSummary = () => request<LogoutSummary>('/auth/logout-summary');

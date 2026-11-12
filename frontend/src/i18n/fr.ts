@@ -39,6 +39,14 @@ export const fr = {
   'status.dnd.d': 'Les appels sont rejetés vers la messagerie vocale',
   'status.footer': "Votre statut est visible dans l'annuaire et sur les postes de vos collègues.",
   'mock.banner': 'Aperçu : données fictives. Ce module sera relié au serveur dans une prochaine phase.',
+  'chat.new': 'Nouvelle discussion', 'chat.newGroup': 'Nouveau groupe', 'chat.groupName': 'Nom du groupe',
+  'chat.pick': 'Choisissez un ou plusieurs collaborateurs', 'chat.create': 'Créer', 'chat.cancel': 'Annuler',
+  'chat.placeholder': 'Écrire un message…', 'chat.send': 'Envoyer', 'chat.attach': 'Joindre un fichier',
+  'chat.typing': '{name} écrit…', 'chat.older': 'Messages précédents', 'chat.deleted': 'Message supprimé',
+  'chat.delete': 'Supprimer', 'chat.download': 'Télécharger', 'chat.empty': 'Sélectionnez une conversation ou démarrez-en une nouvelle.',
+  'chat.lock': 'Messages chiffrés en transit et au repos · archivés sur les serveurs Exim Bank',
+  'chat.fileError': 'Fichier refusé : PDF, PNG ou JPEG de 20 Mo maximum.', 'chat.results': 'Messages trouvés',
+  'chat.you': 'Vous : ', 'chat.members': '{n} membres', 'chat.offline': 'Hors ligne',
   'toast.status': 'Statut : {s}',
 } as const;
 export type Key = keyof typeof fr;

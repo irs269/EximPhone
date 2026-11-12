@@ -3,14 +3,20 @@ package main
 import (
 	"context"
 	"log"
+	"log/slog"
+	"net/url"
 	"os"
 	"time"
 
 	_ "time/tzdata" // site timezones must work on distroless
 
+	"github.com/irs269/eximphone/services/pkg/crypto"
+	"github.com/irs269/eximphone/services/pkg/directory"
 	"github.com/irs269/eximphone/services/pkg/server"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/minio/minio-go/v7"
+	"github.com/minio/minio-go/v7/pkg/credentials"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -42,15 +48,38 @@ func main() {
 		log.Fatal("JWT_SECRET must be at least 32 characters")
 	}
 
+	rdb := redis.NewClient(ropt)
+	box, err := crypto.NewBox(env("MESSAGE_KEY"))
+	if err != nil {
+		log.Fatalf("MESSAGE_KEY: %v", err)
+	}
+	s3u, err := url.Parse(env("S3_ENDPOINT"))
+	if err != nil {
+		log.Fatal(err)
+	}
+	s3, err := minio.New(s3u.Host, &minio.Options{
+		Creds:        credentials.NewStaticV4(env("S3_ACCESS_KEY_ID"), env("S3_SECRET_ACCESS_KEY"), ""),
+		Secure:       s3u.Scheme == "https",
+		Region:       "garage",
+		BucketLookup: minio.BucketLookupPath,
+	})
+	if err != nil {
+		log.Fatal(err)
+	}
+	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil)).With("service", "api")
+
 	a := &app{
 		st:        store{db: db},
-		rdb:       redis.NewClient(ropt),
+		rdb:       rdb,
+		hub:       newHub(rdb, logger),
+		box:       box,
+		s3:        s3,
 		jwtSecret: []byte(secret),
 		now:       func() time.Time { return time.Now().UTC() },
-		ldap: ldapClient{
-			url: env("LDAP_URL"), baseDN: env("LDAP_BASE_DN"), userAttr: env("LDAP_USER_ATTR"),
-			bindDN: env("LDAP_BIND_DN"), bindPassword: env("LDAP_BIND_PASSWORD"),
+		ldap: directory.Client{
+			URL: env("LDAP_URL"), BaseDN: env("LDAP_BASE_DN"), UserAttr: env("LDAP_USER_ATTR"),
+			BindDN: env("LDAP_BIND_DN"), BindPassword: env("LDAP_BIND_PASSWORD"),
 		},
 	}
-	server.RunWith("api", a.routes, nil)
+	server.RunWith("api", a.routes, func(ctx context.Context, _ *slog.Logger) { a.hub.run(ctx) })
 }
