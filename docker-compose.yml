@@ -39,6 +39,11 @@ services:
       DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?sslmode=disable
       REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
       JWT_SECRET: ${JWT_SECRET}
+      LDAP_URL: ${LDAP_URL}
+      LDAP_BASE_DN: ${LDAP_BASE_DN}
+      LDAP_USER_ATTR: ${LDAP_USER_ATTR}
+      LDAP_BIND_DN: ${LDAP_BIND_DN}
+      LDAP_BIND_PASSWORD: ${LDAP_BIND_PASSWORD}
       S3_ENDPOINT: http://garage:3900
       S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID}
       S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY}
@@ -68,6 +73,9 @@ services:
     build: {context: ./services, args: {SERVICE: worker}}
     depends_on: {migrate: {condition: service_completed_successfully}}
     networks: [back, data]
+    environment:
+      <<: *go-env
+      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?sslmode=disable
 
   postgres:
     image: postgres:16-alpine
