@@ -41,6 +41,7 @@ type app struct {
 	ldap      directory.Client
 	hub       *hub
 	box       *crypto.Box
+	sipBox    *crypto.Box
 	s3        *minio.Client
 	jwtSecret []byte
 	now       func() time.Time
@@ -50,10 +51,12 @@ func (a *app) routes(r chi.Router) {
 	r.Post("/auth/login", a.login)
 	r.Post("/auth/refresh", a.refresh)
 	r.Get("/ws", a.serveWS)
+	r.Route("/internal", a.internalRoutes)
 	r.Group(func(r chi.Router) {
 		r.Use(a.requireSession)
 		a.chatRoutes(r)
 		a.callRoutes(r)
+		a.adminRoutes(r)
 		r.Get("/me", a.me)
 		r.Get("/me/attendance", a.history)
 		r.Get("/auth/logout-summary", a.logoutSummary)

@@ -53,6 +53,10 @@ func main() {
 	if err != nil {
 		log.Fatalf("MESSAGE_KEY: %v", err)
 	}
+	sipBox, err := crypto.NewBox(env("SIP_KEY"))
+	if err != nil {
+		log.Fatalf("SIP_KEY: %v", err)
+	}
 	s3u, err := url.Parse(env("S3_ENDPOINT"))
 	if err != nil {
 		log.Fatal(err)
@@ -73,6 +77,7 @@ func main() {
 		rdb:       rdb,
 		hub:       newHub(rdb, logger),
 		box:       box,
+		sipBox:    sipBox,
 		s3:        s3,
 		jwtSecret: []byte(secret),
 		now:       func() time.Time { return time.Now().UTC() },

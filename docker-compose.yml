@@ -45,6 +45,8 @@ services:
       TURN_SECRET: ${TURN_SECRET}
       TURN_PUBLIC_HOST: ${PUBLIC_IP}
       MEDIA_URL: http://media:8080
+      SIP_KEY: ${SIP_KEY}
+      SIP_DOMAIN: ${SIP_DOMAIN}
       LDAP_URL: ${LDAP_URL}
       LDAP_BASE_DN: ${LDAP_BASE_DN}
       LDAP_USER_ATTR: ${LDAP_USER_ATTR}
@@ -57,8 +59,26 @@ services:
   sip:
     <<: *go-service
     build: {context: ./services, args: {SERVICE: sip}}
-    depends_on: {redis: {condition: service_healthy}}
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+      redis: {condition: service_healthy}
+      media: {condition: service_healthy}
     networks: [back, data]
+    ports: ["5060:5060/udp", "5060:5060/tcp", "5061:5061/tcp"]
+    volumes: ["./nginx/certs:/certs:ro"]
+    environment:
+      <<: *go-env
+      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?sslmode=disable
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
+      JWT_SECRET: ${JWT_SECRET}
+      INTERNAL_TOKEN: ${INTERNAL_TOKEN}
+      SIP_KEY: ${SIP_KEY}
+      SIP_DOMAIN: ${SIP_DOMAIN}
+      PUBLIC_IP: ${PUBLIC_IP}
+      SIP_TLS_CERT: /certs/server.crt
+      SIP_TLS_KEY: /certs/server.key
+      API_URL: http://api:8080
+      MEDIA_URL: http://media:8080
 
   media:
     <<: *go-service
@@ -85,6 +105,11 @@ services:
     build: {context: ./services, args: {SERVICE: provisioning}}
     depends_on: {migrate: {condition: service_completed_successfully}}
     networks: [back, data]
+    environment:
+      <<: *go-env
+      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?sslmode=disable
+      SIP_KEY: ${SIP_KEY}
+      PUBLIC_IP: ${PUBLIC_IP}
 
   worker:
     <<: *go-service
@@ -100,6 +125,7 @@ services:
       LDAP_USER_ATTR: ${LDAP_USER_ATTR}
       LDAP_BIND_DN: ${LDAP_BIND_DN}
       LDAP_BIND_PASSWORD: ${LDAP_BIND_PASSWORD}
+      INITIAL_IT_ADMINS: ${INITIAL_IT_ADMINS:-}
 
   postgres:
     image: postgres:16-alpine

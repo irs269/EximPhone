@@ -33,6 +33,8 @@ server {
         proxy_read_timeout 3600s;
     }
 
+    location ^~ /api/internal { return 404; }
+
     location /api/ {
         set $api_upstream http://api:8080;
         rewrite ^/api/(.*)$ /$1 break;

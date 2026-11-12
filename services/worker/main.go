@@ -7,6 +7,7 @@ import (
 	"log"
 	"log/slog"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/irs269/eximphone/services/pkg/directory"
@@ -54,6 +55,15 @@ func syncDirectory(ctx context.Context, db *pgxpool.Pool, dir directory.Client, 
 	tag, err := db.Exec(ctx, `UPDATE users SET active=FALSE WHERE active AND NOT (username::text = ANY($1))`, names)
 	if err != nil {
 		return err
+	}
+	// Bootstrap: the first it_admin accounts come from the environment (comma separated usernames).
+	if admins := strings.Split(os.Getenv("INITIAL_IT_ADMINS"), ","); len(admins) > 0 && strings.TrimSpace(admins[0]) != "" {
+		for i := range admins {
+			admins[i] = strings.TrimSpace(admins[i])
+		}
+		if _, err := db.Exec(ctx, `INSERT INTO user_roles(user_id, role) SELECT id, 'it_admin' FROM users WHERE username::text = ANY($1) ON CONFLICT DO NOTHING`, admins); err != nil {
+			return err
+		}
 	}
 	log.Info("directory synced", "users", len(people), "deactivated", tag.RowsAffected())
 	return nil

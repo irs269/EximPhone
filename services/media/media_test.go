@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"io"
 	"log/slog"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
@@ -63,15 +64,19 @@ type client struct {
 
 // dial negotiates a leg the way the browser does: audio sendrecv, full SDP with candidates.
 func dial(t *testing.T, srv *httptest.Server, call string, user int64) *client {
+	return dialWith(t, srv, call, user, opusCap, 111)
+}
+
+func dialWith(t *testing.T, srv *httptest.Server, call string, user int64, capability webrtc.RTPCodecCapability, pt webrtc.PayloadType) *client {
 	t.Helper()
 	me := &webrtc.MediaEngine{}
-	_ = me.RegisterCodec(webrtc.RTPCodecParameters{RTPCodecCapability: opusCap, PayloadType: 111}, webrtc.RTPCodecTypeAudio)
+	_ = me.RegisterCodec(webrtc.RTPCodecParameters{RTPCodecCapability: capability, PayloadType: pt}, webrtc.RTPCodecTypeAudio)
 	pc, err := webrtc.NewAPI(webrtc.WithMediaEngine(me)).NewPeerConnection(webrtc.Configuration{})
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = pc.Close() })
-	out, _ := webrtc.NewTrackLocalStaticRTP(opusCap, "audio", "client")
+	out, _ := webrtc.NewTrackLocalStaticRTP(capability, "audio", "client")
 	if _, err := pc.AddTrack(out); err != nil {
 		t.Fatal(err)
 	}
@@ -196,5 +201,105 @@ func TestRoomIsLimitedToTwoLegsAndClosedOnDelete(t *testing.T) {
 	}
 	if m.roomCount() != 0 {
 		t.Fatalf("room not removed: %d", m.roomCount())
+	}
+}
+
+func internalPost(t *testing.T, srv *httptest.Server, path string, body any) (int, map[string]any) {
+	t.Helper()
+	b, _ := json.Marshal(body)
+	req, _ := http.NewRequest(http.MethodPost, srv.URL+path, bytes.NewReader(b))
+	req.Header.Set("X-Internal-Token", testToken)
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer res.Body.Close()
+	var out map[string]any
+	_ = json.NewDecoder(res.Body).Decode(&out)
+	return res.StatusCode, out
+}
+
+// A desk phone (plain RTP, G.711) talks to a browser: the browser leg must negotiate PCMU and audio must flow both ways.
+func TestSIPLegBridgesToBrowserWithG711(t *testing.T) {
+	srv, m := newTestServer(t)
+	defer srv.Close()
+
+	if code, _ := internalPost(t, srv, "/legs", map[string]string{"call_id": "x"}); code != 200 {
+		t.Fatalf("leg allocation: %d", code)
+	}
+	code, leg := internalPost(t, srv, "/legs", map[string]string{"call_id": "bridge"})
+	if code != 200 {
+		t.Fatalf("leg allocation: %d", code)
+	}
+	legPort := int(leg["port"].(float64))
+	if legPort < m.sipMin || legPort > m.sipMax {
+		t.Fatalf("port %d outside the SIP range %d-%d", legPort, m.sipMin, m.sipMax)
+	}
+	phone, err := net.ListenUDP("udp4", &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer phone.Close()
+	if code, _ := internalPost(t, srv, "/legs/"+leg["leg_id"].(string)+"/activate", map[string]string{"remote": phone.LocalAddr().String()}); code != http.StatusNoContent {
+		t.Fatalf("activate: %d", code)
+	}
+
+	browser := dialWith(t, srv, "bridge", 5, pcmuCap, 0) // the room now has a phone, so media must answer with G.711
+	stop := make(chan struct{})
+	defer close(stop)
+	browser.stream(0xB5, stop)
+
+	// phone -> browser
+	go func() {
+		seq := uint16(0)
+		tick := time.NewTicker(20 * time.Millisecond)
+		defer tick.Stop()
+		for {
+			select {
+			case <-stop:
+				return
+			case <-tick.C:
+				seq++
+				b, _ := (&rtp.Packet{Header: rtp.Header{Version: 2, PayloadType: 0, SequenceNumber: seq, Timestamp: uint32(seq) * 160, SSRC: 777}, Payload: bytes.Repeat([]byte{0xA7}, 160)}).Marshal()
+				_, _ = phone.WriteToUDP(b, &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1), Port: legPort})
+			}
+		}
+	}()
+	expectMarker(t, browser, 0xA7)
+
+	// browser -> phone (the leg answers to the phone's real source address: latching)
+	buf := make([]byte, 1600)
+	deadline := time.Now().Add(8 * time.Second)
+	for {
+		_ = phone.SetReadDeadline(deadline)
+		n, _, err := phone.ReadFromUDP(buf)
+		if err != nil {
+			t.Fatal("no RTP from the browser reached the phone")
+		}
+		var p rtp.Packet
+		if p.Unmarshal(buf[:n]) == nil && len(p.Payload) > 0 && p.Payload[0] == 0xB5 {
+			if p.PayloadType != 0 {
+				t.Fatalf("phone received payload type %d, want 0 (PCMU)", p.PayloadType)
+			}
+			break
+		}
+	}
+
+	req, _ := http.NewRequest(http.MethodDelete, srv.URL+"/calls/bridge", nil)
+	req.Header.Set("X-Internal-Token", testToken)
+	if res, _ := http.DefaultClient.Do(req); res.StatusCode != http.StatusNoContent {
+		t.Fatalf("close: %d", res.StatusCode)
+	}
+	if m.roomCount() != 0 {
+		t.Fatalf("room not removed: %d", m.roomCount())
+	}
+}
+
+func TestSIPLegEndpointsNeedInternalToken(t *testing.T) {
+	srv, _ := newTestServer(t)
+	defer srv.Close()
+	res, err := http.Post(srv.URL+"/legs", "application/json", bytes.NewReader([]byte(`{"call_id":"x"}`)))
+	if err != nil || res.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("status %v %v", res, err)
 	}
 }

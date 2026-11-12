@@ -111,66 +111,6 @@ func (a *app) insertEnded(ctx context.Context, caller, callee int64, outcome str
 	return id, err
 }
 
-func (a *app) createCall(w http.ResponseWriter, r *http.Request) {
-	ctx, caller := r.Context(), userID(r)
-	var req struct {
-		ToUserID int64 `json:"to_user_id"`
-	}
-	if json.NewDecoder(http.MaxBytesReader(w, r.Body, 256)).Decode(&req) != nil || req.ToUserID == 0 || req.ToUserID == caller {
-		apiError(w, 400, "invalid request")
-		return
-	}
-	callee, err := a.st.getUser(ctx, req.ToUserID)
-	if err != nil || !callee.Active {
-		apiError(w, 404, "user not found")
-		return
-	}
-	if v, err := a.rdb.Get(ctx, activeKey(caller)).Result(); err == nil && v != "" {
-		apiError(w, 409, "already in a call")
-		return
-	}
-
-	status, err := a.rdb.HGet(ctx, "presence", strconv.FormatInt(callee.ID, 10)).Result()
-	outcome := ""
-	switch {
-	case errors.Is(err, redis.Nil):
-		outcome = "offline" // not clocked in: voicemail arrives with the SIP phase
-	case status == "dnd":
-		outcome = "dnd" // equivalent of SIP 486 Busy Here + voicemail
-	}
-	if outcome != "" {
-		id, err := a.insertEnded(ctx, caller, callee.ID, outcome)
-		if err != nil {
-			apiError(w, 500, "internal error")
-			return
-		}
-		writeJSON(w, 200, map[string]any{"id": id, "state": "ended", "outcome": outcome})
-		return
-	}
-
-	var id string
-	if err := a.st.db.QueryRow(ctx, `INSERT INTO calls(caller_id, callee_id, state) VALUES ($1,$2,'ringing') RETURNING id::text`, caller, callee.ID).Scan(&id); err != nil {
-		apiError(w, 500, "internal error")
-		return
-	}
-	if !a.claim(ctx, caller, id) {
-		_, _ = a.st.db.Exec(ctx, `DELETE FROM calls WHERE id=$1::uuid`, id)
-		apiError(w, 409, "already in a call")
-		return
-	}
-	if !a.claim(ctx, callee.ID, id) { // callee already in another call: SIP 486 Busy Here
-		a.release(ctx, caller, id)
-		_, _ = a.st.db.Exec(ctx, `UPDATE calls SET state='ended', outcome='busy', ended_at=now(), duration_sec=0 WHERE id=$1::uuid`, id)
-		writeJSON(w, 200, map[string]any{"id": id, "state": "ended", "outcome": "busy"})
-		return
-	}
-	a.hub.publish(ctx, []int64{callee.ID}, "call_incoming", map[string]any{
-		"call_id": id, "from": a.party(ctx, caller), "silent": status == "meet", // "in meeting": rings without sound
-	})
-	time.AfterFunc(ringTimeout, func() { a.finish(context.Background(), id, "missed", 0, true) })
-	writeJSON(w, 200, map[string]any{"id": id, "state": "ringing", "to": a.party(ctx, callee.ID)})
-}
-
 // finish ends a call exactly once and tells both parties. byUser is 0 for system-initiated ends;
 // onlyRinging makes the ring timeout harmless for calls that were answered in the meantime.
 func (a *app) finish(ctx context.Context, callID, ringingOutcome string, byUser int64, onlyRinging bool) (found bool) {
@@ -194,6 +134,7 @@ func (a *app) finish(ctx context.Context, callID, ringingOutcome string, byUser 
 		outcome = "answered"
 	}
 	a.hub.publish(ctx, []int64{caller, callee}, "call_ended", map[string]any{"call_id": callID, "outcome": outcome, "by": byUser})
+	a.sipCommand(ctx, map[string]any{"type": "ended", "call_id": callID}) // BYE/CANCEL toward desk phones
 	a.dropMedia(callID)
 	return true
 }
@@ -210,7 +151,8 @@ func (a *app) answerCall(w http.ResponseWriter, r *http.Request) {
 	}
 	a.enterCall(ctx, caller)
 	a.enterCall(ctx, uid)
-	a.hub.publish(ctx, []int64{caller, uid}, "call_answered", map[string]any{"call_id": id})
+	a.hub.publish(ctx, []int64{caller, uid}, "call_answered", map[string]any{"call_id": id, "via": "pc"})
+	a.sipCommand(ctx, map[string]any{"type": "pc_answered", "call_id": id}) // cancel the desk phones that were ringing
 	writeJSON(w, 200, map[string]string{"id": id, "state": "active"})
 }
 
