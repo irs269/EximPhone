@@ -4,7 +4,8 @@ import { useApp } from '../store/app';
 import { convTitle, useChat } from '../store/chat';
 import { t } from '../i18n';
 import { Icon } from '../components/Icon';
-import { GroupAvatar, UserAvatar, toPerson } from '../components/Avatar';
+import { GroupAvatar, UserAvatar } from '../components/Avatar';
+import { useCalls } from '../store/calls';
 import { hm } from '../lib';
 
 const ticks: Record<string, string> = { sent: '✓', delivered: '✓✓', read: '✓✓' };
@@ -95,7 +96,7 @@ export function Chat() {
       <div className="top">
         {other ? <UserAvatar u={other} status={useChat.getState().presence[other.id]} /> : <GroupAvatar />}
         <div className="tt"><b>{title}</b><span>{sub}</span></div>
-        {other && other.extension && <button className="ib" aria-label="Appeler" onClick={() => useApp.getState().startCall(toPerson(other))}><Icon name="call" /></button>}
+        {other && other.extension && <button className="ib" aria-label="Appeler" onClick={() => void useCalls.getState().dial(other.id)}><Icon name="call" /></button>}
       </div>
       <div className="msgs" role="log" aria-live="polite">
         {hasMore[active] && <button className="btn ghost" style={{ alignSelf: 'center' }} onClick={() => loadOlder(active)}>{t('chat.older')}</button>}

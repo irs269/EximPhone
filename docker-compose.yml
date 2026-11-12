@@ -19,6 +19,7 @@ services:
     networks: [front, back]
     depends_on:
       api: {condition: service_healthy}
+      media: {condition: service_healthy}
       provisioning: {condition: service_healthy}
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "--no-check-certificate", "https://127.0.0.1/nginx-health"]
@@ -40,6 +41,10 @@ services:
       REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
       JWT_SECRET: ${JWT_SECRET}
       MESSAGE_KEY: ${MESSAGE_KEY}
+      INTERNAL_TOKEN: ${INTERNAL_TOKEN}
+      TURN_SECRET: ${TURN_SECRET}
+      TURN_PUBLIC_HOST: ${PUBLIC_IP}
+      MEDIA_URL: http://media:8080
       LDAP_URL: ${LDAP_URL}
       LDAP_BASE_DN: ${LDAP_BASE_DN}
       LDAP_USER_ATTR: ${LDAP_USER_ATTR}
@@ -58,10 +63,22 @@ services:
   media:
     <<: *go-service
     build: {context: ./services, args: {SERVICE: media}}
+    # RTP needs real source addresses and a wide UDP range; in production use network_mode: host (see docs/deployment.md).
+    ports: ["10000-10200:10000-10200/udp"]
+    environment:
+      <<: *go-env
+      JWT_SECRET: ${JWT_SECRET}
+      INTERNAL_TOKEN: ${INTERNAL_TOKEN}
+      MEDIA_PUBLIC_IP: ${PUBLIC_IP}
 
   turn:
     <<: *go-service
     build: {context: ./services, args: {SERVICE: turn}}
+    ports: ["3478:3478/udp", "3478:3478/tcp", "49152-49200:49152-49200/udp"]
+    environment:
+      <<: *go-env
+      TURN_SECRET: ${TURN_SECRET}
+      PUBLIC_IP: ${PUBLIC_IP}
 
   provisioning:
     <<: *go-service

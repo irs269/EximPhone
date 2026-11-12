@@ -82,6 +82,34 @@ export async function attachmentUrl(id: string): Promise<string> {
   return URL.createObjectURL(await res.blob());
 }
 
+// ---- calls ----
+export interface Party { id: number; display_name: string; extension: string }
+export interface CallLogEntry {
+  id: string; direction: 'in' | 'out'; other: Party; outcome: string; state: string; created_at: string; duration_sec: number;
+}
+export interface CreatedCall { id: string; state: 'ringing' | 'ended'; outcome?: string; to?: Party }
+
+export const createCall = (to_user_id: number) =>
+  request<CreatedCall>('/calls', { method: 'POST', body: JSON.stringify({ to_user_id }) });
+export const answerCall = (id: string) => request<unknown>(`/calls/${id}/answer`, { method: 'POST' });
+export const hangupCall = (id: string) => request<unknown>(`/calls/${id}/hangup`, { method: 'POST' });
+export const holdCall = (id: string, on: boolean) => request<unknown>(`/calls/${id}/hold`, { method: 'POST', body: JSON.stringify({ on }) });
+export const transferCall = (id: string, to_user_id: number) =>
+  request<{ id: string }>(`/calls/${id}/transfer`, { method: 'POST', body: JSON.stringify({ to_user_id }) });
+export const callLog = () => request<{ calls: CallLogEntry[] }>('/calls');
+export const iceServers = () => request<{ ice_servers: RTCIceServer[] }>('/calls/ice');
+export const mediaToken = (id: string) => request<{ token: string }>(`/calls/${id}/token`);
+
+/** WebRTC offer/answer against the media service (non-trickle ICE). */
+export async function mediaOffer(callId: string, mediaJwt: string, sdp: string): Promise<string> {
+  const res = await fetch(`/media/calls/${callId}/offer`, {
+    method: 'POST', headers: { Authorization: `Bearer ${mediaJwt}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ sdp }),
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new ApiError(res.status, body.error ?? 'media error');
+  return body.sdp as string;
+}
+
 export const me = () => request<{ user: User; attendance: Day | null }>('/me');
 export const history = () => request<{ days: Day[] }>('/me/attendance');
 export const logoutSummary = () => request<LogoutSummary>('/auth/logout-summary');

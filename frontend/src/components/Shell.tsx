@@ -2,12 +2,13 @@ import { useQuery } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { history, searchMessages, type Message } from '../api/client';
 import { convTitle, useChat } from '../store/chat';
+import { useCalls } from '../store/calls';
 import { NewChatDialog } from './NewChatDialog';
 import { useApp, type View } from '../store/app';
 import { t } from '../i18n';
 import { Icon, type IconName } from './Icon';
-import { Avatar, GroupAvatar, UserAvatar, presenceColor } from './Avatar';
-import { person, type Presence } from '../data/mock';
+import { GroupAvatar, UserAvatar, presenceColor } from './Avatar';
+import type { Presence } from '../data/mock';
 import { hm, durMin, initials } from '../lib';
 import { Chat as ChatView } from '../views/Chat';
 import { Phone } from '../views/Phone';
@@ -76,6 +77,7 @@ function ListPane() {
   const q = s.query.toLowerCase();
   const titles: Record<View, Parameters<typeof t>[0]> = { chat: 'nav.messages', phone: 'nav.calls', dir: 'nav.directory', att: 'nav.attendance', ann: 'nav.announcements' };
   const chat = useChat();
+  const calls = useCalls();
   const [hits, setHits] = useState<Message[]>([]);
   useEffect(() => {
     if (s.view !== 'chat' || q.length < 2) { setHits([]); return; }
@@ -107,13 +109,14 @@ function ListPane() {
         </button>))] : []),
     ];
   } else if (s.view === 'phone') {
-    items = [<div className="sec" key="h">{t('list.recent')}</div>, ...s.calls.filter((c) => person(c.person).name.toLowerCase().includes(q)).map((c, i) => {
-      const p = person(c.person);
+    items = [<div className="sec" key="h">{t('list.recent')}</div>, ...calls.log.filter((c) => c.other.display_name.toLowerCase().includes(q)).map((c) => {
+      const kind = c.direction === 'out' ? 'out' : c.outcome === 'answered' ? 'in' : 'miss';
+      const u = chat.users[c.other.id] ?? { id: c.other.id, display_name: c.other.display_name };
       return (
-        <button key={i} className="it" onClick={() => s.startCall(p)}>
-          <Avatar p={p} />
-          <div className="t"><div className="n"><span className={c.kind}>{p.name}</span><small>{c.when}</small></div>
-            <div className="s">{c.kind === 'miss' ? '↙ Manqué' : c.kind === 'in' ? '↙ Entrant' : '↗ Sortant'} · Poste {p.ext}</div></div>
+        <button key={c.id} className="it" onClick={() => void calls.dial(c.other.id)}>
+          <UserAvatar u={u} status={chat.presence[c.other.id]} />
+          <div className="t"><div className="n"><span className={kind}>{c.other.display_name}</span><small>{hm(c.created_at)}</small></div>
+            <div className="s">{kind === 'miss' ? '↙ Manqué' : kind === 'in' ? '↙ Entrant' : '↗ Sortant'} · Poste {c.other.extension}{c.duration_sec ? ` · ${Math.floor(c.duration_sec / 60)} min ${c.duration_sec % 60} s` : ''}</div></div>
         </button>
       );
     })];

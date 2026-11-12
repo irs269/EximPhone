@@ -53,6 +53,14 @@ server {
         proxy_read_timeout 3600s;
     }
 
+    # WebRTC offer/answer for calls (RTP itself goes straight to media over UDP).
+    location /media/calls/ {
+        set $media_upstream http://media:8080;
+        rewrite ^/media/(.*)$ /$1 break;
+        proxy_pass $media_upstream;
+        proxy_set_header Host $http_host;
+    }
+
     location /prov/ {
         set $prov_upstream http://provisioning:8080;
         rewrite ^/prov/(.*)$ /$1 break;

@@ -27,8 +27,9 @@ seed: ## Apply db/seed/*.sql (LDAP demo users are loaded automatically by ldap-m
 test:
 	docker run --rm -v "$(CURDIR)/services:/src" -w /src golang:1.23-alpine go test ./...
 
-e2e: ## Realtime chat/presence acceptance test (needs make dev; local self-signed cert only)
-	NODE_TLS_REJECT_UNAUTHORIZED=0 node tests/e2e/realtime.mjs
+e2e: ## Chat, presence and call signaling acceptance tests (needs make dev; local self-signed cert only)
+	NODE_TLS_REJECT_UNAUTHORIZED=0 node tests/e2e/realtime.mjs https://127.0.0.1
+	NODE_TLS_REJECT_UNAUTHORIZED=0 node tests/e2e/calls.mjs https://127.0.0.1
 
 certs: ## Self-signed dev certificate (nginx/certs)
 	@if [ ! -f nginx/certs/server.crt ]; then mkdir -p nginx/certs && \
