@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import * as api from '../api/client';
 import type { Conversation, DirUser, Message } from '../api/client';
+import { useCalls } from './calls';
 import { connectSocket, disconnectSocket, sendSocket, type ServerEvent } from '../api/socket';
 
 interface ChatState {
@@ -89,6 +90,9 @@ export const useChat = create<ChatState>((set, get) => {
       case 'conversation':
         void loadConvs();
         break;
+      case 'call_incoming': case 'call_answered': case 'call_ended': case 'call_hold': case 'call_transferred':
+        useCalls.getState().onEvent(type, data);
+        break;
       case 'typing':
         if (data.user_id === s.me) break;
         set((st) => ({ typing: { ...st.typing, [data.conversation_id]: data.user_id } }));
@@ -104,10 +108,11 @@ export const useChat = create<ChatState>((set, get) => {
 
     start(meId) {
       set({ ...empty, me: meId });
-      connectSocket(onEvent, () => { void resync(); });
+      connectSocket(onEvent, () => { void resync(); void useCalls.getState().loadLog(); });
     },
     stop() {
       disconnectSocket();
+      useCalls.getState().reset();
       set({ ...empty });
     },
 

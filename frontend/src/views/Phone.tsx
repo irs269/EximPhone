@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { useApp } from '../store/app';
+import { useCalls } from '../store/calls';
+import { useChat } from '../store/chat';
 import { t } from '../i18n';
 import { Icon, type IconName } from '../components/Icon';
-import { Avatar, presenceColor } from '../components/Avatar';
-import { initials } from '../lib';
-import { people, person, type Person } from '../data/mock';
+import { UserAvatar, presenceColor } from '../components/Avatar';
 
 const keys: [string, string][] = [['1', ''], ['2', 'ABC'], ['3', 'DEF'], ['4', 'GHI'], ['5', 'JKL'], ['6', 'MNO'], ['7', 'PQRS'], ['8', 'TUV'], ['9', 'WXYZ'], ['*', ''], ['0', '+'], ['#', '']];
 
@@ -22,34 +22,38 @@ function Device({ k, icon, title, sub }: { k: 'desk' | 'pc'; icon: IconName; tit
 }
 
 export function Phone() {
-  const { user, presence, toggleStatusMenu, startCall, incoming } = useApp();
+  const { user, presence, toggleStatusMenu, showToast } = useApp();
+  const { dial: place } = useCalls();
+  const { users, presence: lines } = useChat();
   const [dial, setDial] = useState('');
-  const match = people.find((p) => p.ext === dial);
+  const all = Object.values(users);
+  const match = all.find((u) => u.extension === dial);
   const ext = user?.extension ?? '';
+  const shortcuts = all.filter((u) => u.id !== user?.id && lines[u.id]).slice(0, 3);
 
   function call() {
     if (!dial) return;
-    const p: Person = match ?? { id: 0, name: dial, ini: '#', color: 'var(--slate)', role: 'Appel externe via opérateur', ext: dial, dept: '', site: '', line: 'on' };
+    if (!match) { showToast(dial.startsWith('0') ? 'Appels externes : trunk opérateur non activé.' : 'Numéro interne inconnu.'); return; }
+    if (match.id === user?.id) { showToast('Vous ne pouvez pas vous appeler.'); return; }
     setDial('');
-    startCall(p);
+    void place(match.id);
   }
 
   return (
     <>
-      <div className="mock" role="note">{t('mock.banner')}</div>
       <div className="top">
         <div className="tt"><b>Téléphone</b><span>Votre numéro interne : {ext} · {user?.display_name}</span></div>
         <button className="stchip" onClick={(e) => { e.stopPropagation(); toggleStatusMenu(true); }}>
           <i style={{ background: presenceColor[presence] }} />{t(`status.${presence}`)} ▾
         </button>
       </div>
-      {presence === 'dnd' && <div style={{ background: 'var(--alert-bg)', color: 'var(--alert-dark)', padding: '10px 24px', fontSize: 13 }}><b>{t('status.dnd')}</b> : vos appels entrants sont renvoyés vers la messagerie vocale.</div>}
-      {presence === 'away' && <div style={{ background: 'var(--gold-light)', color: 'var(--tag-text)', padding: '10px 24px', fontSize: 13 }}><b>{t('status.away')}</b> : vos appels sont renvoyés vers le poste de délégation.</div>}
+      {presence === 'dnd' && <div style={{ background: 'var(--alert-bg)', color: 'var(--alert-dark)', padding: '10px 24px', fontSize: 13 }}><b>{t('status.dnd')}</b> : vos appels entrants sont rejetés.</div>}
+      {presence === 'meet' && <div style={{ background: 'var(--gold-light)', color: 'var(--tag-text)', padding: '10px 24px', fontSize: 13 }}><b>{t('status.meet')}</b> : les appels sonnent sans bruit.</div>}
       <div className="phone">
         <div className="card">
           <h4>Clavier</h4>
           <div className="disp" aria-live="polite">{dial || ' '}</div>
-          <div className="who2">{match ? `${match.name} — ${match.role}` : dial.length >= 4 ? 'Numéro externe' : ''}</div>
+          <div className="who2">{match ? `${match.display_name} — ${match.department}` : dial.length >= 4 ? (dial.startsWith('0') ? 'Numéro externe' : 'Numéro inconnu') : ''}</div>
           <div className="pad">
             {keys.map(([k, s]) => <button key={k} onClick={() => setDial((d) => (d + k).slice(0, 12))}>{k}<small>{s || ' '}</small></button>)}
           </div>
@@ -61,26 +65,22 @@ export function Phone() {
         <div>
           <div className="card">
             <h4>Mes appareils <span className="pill">Synchronisés</span></h4>
-            <Device k="desk" icon="desk" title="Poste de bureau" sub="Téléphone IP (SIP) · rattaché à votre numéro" />
-            <Device k="pc" icon="pc" title="Application PC" sub="EximPhone Desktop v0.1" />
+            <Device k="desk" icon="desk" title="Poste de bureau" sub="Téléphone IP (SIP) · disponible en phase 5" />
+            <Device k="pc" icon="pc" title="Application PC" sub="EximPhone Desktop v0.1 · audio WebRTC" />
             <div style={{ fontSize: 12, color: 'var(--muted)', lineHeight: 1.5 }}>Les appels vers le <b>{ext}</b> sonnent sur tous les appareils actifs. Décrochez sur l'un, les autres s'arrêtent.</div>
           </div>
           <div className="card hist" style={{ marginTop: 24 }}>
-            <h4>Raccourcis</h4>
-            {[8, 2, 5].map((id) => {
-              const p = person(id);
-              return (
-                <button key={id} className="it" onClick={() => startCall(p)}>
-                  <Avatar p={p} /><div className="t"><div className="n">{p.name}<small>{p.ext}</small></div><div className="s">{p.role}</div></div>
-                  <span className="ib"><Icon name="call" /></span>
-                </button>
-              );
-            })}
-            <button className="btn gold" style={{ width: '100%', marginTop: 12 }} onClick={incoming}>Simuler un appel entrant</button>
+            <h4>Collègues en ligne</h4>
+            {shortcuts.map((u) => (
+              <button key={u.id} className="it" onClick={() => void place(u.id)}>
+                <UserAvatar u={u} status={lines[u.id]} /><div className="t"><div className="n">{u.display_name}<small>{u.extension}</small></div><div className="s">{u.department}</div></div>
+                <span className="ib"><Icon name="call" /></span>
+              </button>
+            ))}
+            {!shortcuts.length && <div style={{ color: 'var(--muted)', fontSize: 13 }}>Personne d'autre n'est connecté pour le moment.</div>}
           </div>
         </div>
       </div>
-      <span className="sr-only">{initials(user?.display_name ?? '')}</span>
     </>
   );
 }

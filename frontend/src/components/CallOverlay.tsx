@@ -1,69 +1,104 @@
 import { useEffect, useState } from 'react';
 import { useApp } from '../store/app';
-import { Avatar } from './Avatar';
+import { useCalls } from '../store/calls';
+import { useChat } from '../store/chat';
 import { Icon, type IconName } from './Icon';
+import { UserAvatar } from './Avatar';
 import { mmss } from '../lib';
 
-const controls: [string, IconName, string][] = [['mute', 'mic', 'Muet'], ['hold', 'pause', 'Attente'], ['transfer', 'transfer', 'Transférer'], ['pad', 'grid', 'Clavier']];
+function TransferPicker() {
+  const { call, transfer, setTransferOpen } = useCalls();
+  const { users, presence, me } = useChat();
+  const [q, setQ] = useState('');
+  const list = Object.values(users)
+    .filter((u) => u.id !== me && u.id !== call?.peer.id && presence[u.id] && presence[u.id] !== 'dnd' && u.display_name.toLowerCase().includes(q.toLowerCase()))
+    .sort((a, b) => a.display_name.localeCompare(b.display_name));
+  return (
+    <div className="xfer" role="dialog" aria-label="Transférer l'appel">
+      <input className="inp" autoFocus placeholder="Transférer vers…" aria-label="Transférer vers" value={q} onChange={(e) => setQ(e.target.value)} />
+      <div className="picker">
+        {list.map((u) => (
+          <button key={u.id} className="it" onClick={() => void transfer(u.id)}>
+            <UserAvatar u={u} status={presence[u.id]} />
+            <div className="t"><div className="n">{u.display_name}<small>{u.extension}</small></div><div className="s">{u.department}</div></div>
+          </button>
+        ))}
+        {!list.length && <div className="sec" style={{ color: 'var(--muted)' }}>Aucun collaborateur disponible</div>}
+      </div>
+      <button className="btn ghost" style={{ width: '100%' }} onClick={() => setTransferOpen(false)}>Annuler</button>
+    </div>
+  );
+}
 
 export function CallOverlay() {
-  const { call, devs, user, hang, answer, toggleFlag, showToast } = useApp();
+  const { call, transferOpen, answer, hangup, toggleMute, toggleHold, setTransferOpen } = useCalls();
+  const devs = useApp((s) => s.devs);
   const [secs, setSecs] = useState(0);
-  const live = call?.mode === 'live';
+  const start = call?.mode === 'live' ? call.answeredAt : undefined;
 
   useEffect(() => {
-    if (!live) { setSecs(0); return; }
-    const id = window.setInterval(() => setSecs((s) => s + 1), 1000);
+    if (!start) { setSecs(0); return; }
+    const tick = () => setSecs(Math.max(0, Math.round((Date.now() - start) / 1000)));
+    tick();
+    const id = window.setInterval(tick, 1000);
     return () => window.clearInterval(id);
-  }, [live]);
+  }, [start]);
 
   if (!call) return null;
-  const { who, mode, flags } = call;
-  const ext = user?.extension ?? '';
-  const label = mode === 'in' ? `Appel entrant · Poste ${ext}` : mode === 'out' ? 'Appel en cours…' : flags.hold ? 'En attente' : 'En communication';
+  const { peer, mode, direction } = call;
+  const label = mode === 'transferring' ? `Transfert vers ${peer.display_name}…`
+    : mode === 'ringing' ? (direction === 'in' ? (call.transferredBy ? `Appel transféré par ${call.transferredBy.display_name}` : 'Appel entrant') : 'Appel en cours…')
+    : call.held ? 'En attente' : call.remoteHeld ? 'Mis en attente par votre correspondant' : 'En communication';
+  const peerUser = { id: peer.id, display_name: peer.display_name };
+
+  const controls: { k: 'mute' | 'hold' | 'transfer'; icon: IconName; text: string; on: boolean; run: () => void }[] = [
+    { k: 'mute', icon: 'mic', text: 'Muet', on: call.muted, run: toggleMute },
+    { k: 'hold', icon: 'pause', text: 'Attente', on: call.held, run: () => void toggleHold() },
+    { k: 'transfer', icon: 'transfer', text: 'Transférer', on: transferOpen, run: () => setTransferOpen(!transferOpen) },
+  ];
 
   return (
     <div id="call" role="presentation">
       <div className="cbox" role="dialog" aria-modal="true" aria-label={label}>
         <div className={mode !== 'live' ? 'ring' : ''}>
           <div className="lbl">{label}</div>
-          <Avatar p={who} dot={false} />
-          <b>{who.name}</b>
-          <div className="sub">{who.role} · Poste {who.ext}</div>
-          {mode === 'in' && (
+          <UserAvatar u={peerUser} />
+          <b>{peer.display_name}</b>
+          <div className="sub">Poste {peer.extension}</div>
+          {mode === 'ringing' && direction === 'in' && (
             <>
               <div className="ring-on">
                 {devs.desk && <span><Icon name="desk" /> Poste de bureau</span>}
                 {devs.pc && <span><Icon name="pc" /> PC</span>}
-                {!devs.desk && !devs.pc && <span>Aucun appareil actif</span>}
+                {call.silent && <span>Sonnerie silencieuse (en réunion)</span>}
               </div>
               <div className="callbtn">
-                <button className="round red" aria-label="Refuser" onClick={() => hang(0)}><Icon name="call" rotate={135} /></button>
-                <button className="round" aria-label="Décrocher" onClick={answer}><Icon name="call" /></button>
+                <button className="round red" aria-label="Refuser" onClick={() => void hangup()}><Icon name="call" rotate={135} /></button>
+                <button className="round" aria-label="Décrocher" onClick={() => void answer()}><Icon name="call" /></button>
               </div>
             </>
           )}
-          {mode === 'out' && (
+          {((mode === 'ringing' && direction === 'out') || mode === 'transferring') && (
             <>
               <div className="sub" style={{ marginTop: 14 }}>Sonnerie…</div>
-              <div className="callbtn"><button className="round red" aria-label="Raccrocher" onClick={() => hang(0)}><Icon name="call" rotate={135} /></button></div>
+              <div className="callbtn"><button className="round red" aria-label="Raccrocher" onClick={() => void hangup()}><Icon name="call" rotate={135} /></button></div>
             </>
           )}
           {mode === 'live' && (
             <>
               <div className="tm" aria-live="off">{mmss(secs)}</div>
+              {call.mediaState && call.mediaState !== 'connected' && <div className="sub">Connexion audio… ({call.mediaState})</div>}
+              {call.micMissing && <div className="sub">Microphone indisponible</div>}
               <div className="ctrl">
-                {controls.map(([k, icon, text]) => (
-                  <button key={k} className={flags[k] ? 'act' : ''} aria-pressed={!!flags[k]}
-                    onClick={() => { toggleFlag(k); if (k === 'transfer') showToast('Transfert : composez le poste de destination'); }}>
-                    <i><Icon name={icon} /></i>{text}
-                  </button>
+                {controls.map((c) => (
+                  <button key={c.k} className={c.on ? 'act' : ''} aria-pressed={c.on} onClick={c.run}><i><Icon name={c.icon} /></i>{c.text}</button>
                 ))}
               </div>
-              <button className="round red" aria-label="Raccrocher" onClick={() => hang(secs)}><Icon name="call" rotate={135} /></button>
+              {transferOpen && <TransferPicker />}
+              <button className="round red" aria-label="Raccrocher" onClick={() => void hangup()}><Icon name="call" rotate={135} /></button>
             </>
           )}
-          <div className="enc"><Icon name="lock" size={11} /> Appel chiffré (SRTP) · Réseau interne Exim Bank</div>
+          <div className="enc"><Icon name="lock" size={11} /> Appel relayé par le serveur Exim Bank · réseau interne</div>
         </div>
       </div>
     </div>

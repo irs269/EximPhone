@@ -3,10 +3,8 @@ import * as api from '../api/client';
 import { ApiError, type Day, type LogoutSummary, type User } from '../api/client';
 import { t } from '../i18n';
 import { useChat } from './chat';
-import {
-  initialAnnouncements, initialCalls, person,
-  type Announcement, type CallLog, type Person, type Presence,
-} from '../data/mock';
+import { useCalls } from './calls';
+import { initialAnnouncements, type Announcement, type Presence } from '../data/mock';
 
 export type View = 'chat' | 'phone' | 'dir' | 'att' | 'ann';
 export type Dialog =
@@ -14,7 +12,6 @@ export type Dialog =
   | { kind: 'logout'; summary: LogoutSummary }
   | { kind: 'bye'; time: string; durationMin: number; name: string }
   | null;
-export interface Call { who: Person; mode: 'out' | 'in' | 'live'; flags: Record<string, boolean> }
 
 interface State {
   // --- session (real backend) ---
@@ -36,9 +33,7 @@ interface State {
   statusMenu: boolean;
   toast: string;
   devs: { desk: boolean; pc: boolean };
-  calls: CallLog[];
   anns: Announcement[];
-  call: Call | null;
   setView: (v: View) => void;
   setCur: (c: string) => void;
   setQuery: (q: string) => void;
@@ -47,14 +42,8 @@ interface State {
   showToast: (m: string) => void;
   toggleDev: (k: 'desk' | 'pc') => void;
   ack: (id: number) => void;
-  startCall: (p: Person) => void;
-  incoming: () => void;
-  answer: () => void;
-  hang: (secs: number) => void;
-  toggleFlag: (k: string) => void;
 }
 
-const nowHM = () => new Date().toTimeString().slice(0, 5);
 
 function loginMessage(e: unknown): string {
   if (e instanceof ApiError) {
@@ -106,7 +95,8 @@ export const useApp = create<State>((set, get) => ({
       const name = get().user?.display_name.split(' ')[0] ?? '';
       const r = await api.logout(reason);
       useChat.getState().stop();
-      set({ phase: 'out', user: null, today: null, call: null,
+      useCalls.getState().reset();
+      set({ phase: 'out', user: null, today: null,
         dialog: { kind: 'bye', time: r.clock_out, durationMin: r.duration_min, name } });
       return null;
     } catch (e) {
@@ -117,7 +107,7 @@ export const useApp = create<State>((set, get) => ({
 
   view: 'chat', cur: '', query: '', presence: 'on', statusMenu: false, toast: '',
   devs: { desk: true, pc: true },
-  calls: initialCalls(), anns: initialAnnouncements(), call: null,
+  anns: initialAnnouncements(),
 
   setView(v) {
     set({ view: v, query: '' });
@@ -139,32 +129,4 @@ export const useApp = create<State>((set, get) => ({
 
   ack: (id) => set((s) => ({ anns: s.anns.map((a) => (a.id === id ? { ...a, ack: true } : a)) })),
 
-  startCall(p) {
-    if (get().call) return;
-    set({ call: { who: p, mode: 'out', flags: {} } });
-    window.setTimeout(() => {
-      const c = get().call;
-      if (c && c.who === p && c.mode === 'out') set({ call: { ...c, mode: 'live' } });
-    }, 2200);
-  },
-  incoming() {
-    const { call, presence, showToast } = get();
-    if (call) return;
-    const p = person(1);
-    if (presence === 'dnd') {
-      set((s) => ({ calls: [{ person: p.id, kind: 'miss', when: nowHM() }, ...s.calls] }));
-      showToast(`${t('status.dnd')} : ${p.name}`);
-      return;
-    }
-    if (presence === 'away') { showToast(`${t('status.away')} : ${p.name}`); return; }
-    set({ call: { who: p, mode: 'in', flags: {} } });
-    if (presence === 'meet') showToast(t('status.meet.d'));
-  },
-  answer: () => set((s) => (s.call ? { call: { ...s.call, mode: 'live' } } : {})),
-  hang(secs) {
-    const c = get().call;
-    if (!c) return;
-    set((s) => ({ call: null, calls: [{ person: c.who.id, kind: secs ? 'out' : 'miss', when: nowHM() }, ...s.calls] }));
-  },
-  toggleFlag: (k) => set((s) => (s.call ? { call: { ...s.call, flags: { ...s.call.flags, [k]: !s.call.flags[k] } } } : {})),
 }));

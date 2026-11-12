@@ -53,6 +53,7 @@ func (a *app) routes(r chi.Router) {
 	r.Group(func(r chi.Router) {
 		r.Use(a.requireSession)
 		a.chatRoutes(r)
+		a.callRoutes(r)
 		r.Get("/me", a.me)
 		r.Get("/me/attendance", a.history)
 		r.Get("/auth/logout-summary", a.logoutSummary)

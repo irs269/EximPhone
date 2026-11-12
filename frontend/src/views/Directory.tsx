@@ -2,14 +2,16 @@ import { useApp } from '../store/app';
 import { useChat } from '../store/chat';
 import { t } from '../i18n';
 import { Icon } from '../components/Icon';
-import { UserAvatar, toPerson } from '../components/Avatar';
+import { UserAvatar } from '../components/Avatar';
+import { useCalls } from '../store/calls';
 
 const label: Record<string, string> = {
   on: 'status.on', busy: 'status.busy', meet: 'status.meet', away: 'status.away', dnd: 'status.dnd',
 };
 
 export function Directory() {
-  const { cur, startCall, setView } = useApp();
+  const { cur, setView } = useApp();
+  const dial = useCalls((c) => c.dial);
   const { users, presence, startDirect } = useChat();
   const list = Object.values(users);
   const u = users[Number(cur.slice(1))] ?? list[0];
@@ -25,7 +27,7 @@ export function Directory() {
           <UserAvatar u={u} status={st} big />
           <div className="info"><b>{u.display_name}</b><span>{u.department}</span></div>
           <div className="acts">
-            {u.extension && <button className="btn" onClick={() => startCall(toPerson(u))}><Icon name="call" /> Appeler</button>}
+            {u.extension && <button className="btn" onClick={() => void dial(u.id)}><Icon name="call" /> Appeler</button>}
             <button className="btn gold" onClick={async () => { await startDirect(u.id); setView('chat'); }}><Icon name="chat" /> Message</button>
           </div>
           <div className="rows">

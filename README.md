@@ -4,7 +4,7 @@ Internal communication and attendance platform for Exim Bank. Full spec: [docs/P
 
 ## Status
 
-Phase 0 (foundation) done. Phase 1 (auth + attendance API) done: LDAP login = clock-in, network check, late/early rules, logout = clock-out, midnight auto-close by the worker. Phase 2 (frontend + brand) done: React app faithful to the prototype, design tokens, French UI with i18n catalogs, Electron shell. Login and Presence use the real API; Calls and Announcements are mock data until phases 4-6.
+Phase 0 (foundation) done. Phase 1 (auth + attendance API) done: LDAP login = clock-in, network check, late/early rules, logout = clock-out, midnight auto-close by the worker. Phase 2 (frontend + brand) done: React app faithful to the prototype, design tokens, French UI with i18n catalogs, Electron shell. Login and Presence use the real API; Announcements are mock data until phase 6.
 
 Phase 3 (presence + chat) done: realtime presence and messaging over WebSocket + Redis pub/sub, direct and group conversations, receipts (sent/delivered/read), typing indicator, attachments (PDF/PNG/JPEG, 20 MB, MIME-sniffed) in Garage, messages AES-256-GCM encrypted at rest, logical deletion only, nightly LDAP directory sync. Acceptance test: `make e2e` (22 checks; presence propagates in under 100 ms locally).
 
@@ -38,3 +38,5 @@ Windows: `./scripts/make.ps1 dev`. Then open https://localhost (self-signed cert
 
 - `frontend/`: React 18 + TypeScript + Vite. Brand tokens live in `src/theme/tokens.ts` (no hard-coded colors elsewhere). `npm run dev` (proxies `/api` to https://localhost), `npm test`, `npm run build`. The production build is baked into the nginx image (`frontend/Dockerfile`).
 - `desktop/`: Electron shell that opens the server URL (`EXIM_URL`, or `%APPDATA%/EximPhone/config.json` `{"url": "..."}`; default https://localhost). `npm start` to try, `npm run dist` for the Windows installer. TLS uses the Windows trust store: install the bank CA there. The installer still needs a branded `icon.ico` (256x256).
+
+Phase 4 (PC to PC calls) done: see [docs/calls.md](docs/calls.md). WebRTC audio relayed by `media`, in-house `turn`, signaling over the WebSocket, call journal, hold, mute, blind transfer, busy/DND handling. Verified with two real browsers through the Docker stack; the microphone could not be tested in the automation browser (listen-only fallback was used).

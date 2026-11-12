@@ -199,3 +199,5 @@ button.it{width:100%;text-align:left;font:inherit;color:inherit}
 .picker label:hover{background:var(--hover)}
 .newbtn{margin:10px 18px 0;width:calc(100% - 36px)}
 .dbox .form{padding:20px 26px;text-align:left}
+.xfer{background:var(--surface);color:var(--text);border-radius:12px;padding:12px;margin:0 0 16px;text-align:left}
+.xfer .picker{max-height:180px;margin:8px 0}
