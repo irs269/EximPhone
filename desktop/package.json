@@ -1,0 +1,23 @@
+{
+  "name": "eximphone-desktop",
+  "version": "0.1.0",
+  "description": "EximPhone desktop client for Exim Bank",
+  "author": "Exim Bank",
+  "private": true,
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win"
+  },
+  "devDependencies": {
+    "electron": "^33.2.0",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "tz.eximbank.eximphone",
+    "productName": "EximPhone",
+    "files": ["main.js", "offline.html"],
+    "win": { "target": "nsis" },
+    "nsis": { "oneClick": false, "perMachine": true, "allowToChangeInstallationDirectory": true }
+  }
+}

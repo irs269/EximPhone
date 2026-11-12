@@ -1,5 +1,0 @@
-/* Temporary page; replaced by the React frontend in phase 2. */
-:root { --navy: #002E6C; --gold: #A99564; --bg: #F4F6FA; --text: #1D2433; }
-body { margin: 0; background: var(--bg); color: var(--text); font-family: system-ui, sans-serif; }
-main { max-width: 36rem; margin: 20vh auto; padding: 0 1rem; border-left: 4px solid var(--gold); padding-left: 1.5rem; }
-h1 { color: var(--navy); }

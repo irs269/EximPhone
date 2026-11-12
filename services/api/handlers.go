@@ -46,6 +46,7 @@ func (a *app) routes(r chi.Router) {
 	r.Group(func(r chi.Router) {
 		r.Use(a.requireSession)
 		r.Get("/me", a.me)
+		r.Get("/me/attendance", a.history)
 		r.Get("/auth/logout-summary", a.logoutSummary)
 		r.Post("/auth/logout", a.logout)
 	})
@@ -321,4 +322,13 @@ func (a *app) logout(w http.ResponseWriter, r *http.Request) {
 	clearRefresh(w)
 	a.st.audit(ctx, &u.ID, u.Username, "logout", clientIP(r), map[string]any{"departure": dep, "duration_min": mins})
 	writeJSON(w, http.StatusOK, map[string]any{"clock_in": d.ClockIn, "clock_out": now, "duration_min": mins, "departure": dep})
+}
+
+func (a *app) history(w http.ResponseWriter, r *http.Request) {
+	days, err := a.st.history(r.Context(), userID(r), 31)
+	if err != nil {
+		apiError(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"days": days})
 }
