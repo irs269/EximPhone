@@ -146,3 +146,21 @@ func (s store) audit(ctx context.Context, actorID *int64, name, action, ip strin
 	_, _ = s.db.Exec(ctx, `INSERT INTO audit_log (actor_id, actor_name, action, ip, details)
 		VALUES ($1, $2, $3, NULLIF($4,'')::inet, $5)`, actorID, name, action, ip, b)
 }
+
+// history returns the most recent work days, newest first.
+func (s store) history(ctx context.Context, userID int64, limit int) ([]day, error) {
+	rows, err := s.db.Query(ctx, `SELECT `+dayCols+` FROM attendance_days WHERE user_id=$1 ORDER BY work_date DESC LIMIT $2`, userID, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []day{}
+	for rows.Next() {
+		d, err := scanDay(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, *d)
+	}
+	return out, rows.Err()
+}

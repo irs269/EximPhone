@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'">
+  <title>EximPhone</title>
+  <style>
+    body { font-family: 'Segoe UI', Arial, sans-serif; background: #F4F6FA; color: #1D2433; display: grid; place-items: center; height: 100vh; margin: 0; }
+    main { max-width: 440px; border-left: 4px solid #A99564; padding-left: 24px; }
+    h1 { color: #002E6C; } button { background: #002E6C; color: #fff; border: 0; border-radius: 8px; padding: 10px 18px; font-size: 15px; cursor: pointer; }
+    p { line-height: 1.5; color: #6B7387; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Serveur injoignable</h1>
+    <p>EximPhone ne peut pas joindre le serveur de la banque. Vérifiez que vous êtes connecté au réseau interne d'Exim Bank, puis réessayez. Support IT : poste 1000.</p>
+    <button id="retry">Réessayer</button>
+  </main>
+  <script>
+    const url = new URLSearchParams(location.search).get('url');
+    document.getElementById('retry').onclick = () => { location.href = url; };
+  </script>
+</body>
+</html>
