@@ -4,9 +4,10 @@ import { ApiError, type Day, type LogoutSummary, type User } from '../api/client
 import { t } from '../i18n';
 import { useChat } from './chat';
 import { useCalls } from './calls';
-import { initialAnnouncements, type Announcement, type Presence } from '../data/mock';
+import { useAnn } from './ann';
+import type { Presence } from '../data/mock';
 
-export type View = 'chat' | 'phone' | 'dir' | 'att' | 'ann';
+export type View = 'chat' | 'phone' | 'dir' | 'att' | 'ann' | 'team' | 'audit';
 export type Dialog =
   | { kind: 'arrival'; resumed: boolean }
   | { kind: 'logout'; summary: LogoutSummary }
@@ -17,6 +18,7 @@ interface State {
   // --- session (real backend) ---
   phase: 'loading' | 'out' | 'in';
   user: User | null;
+  roles: string[];
   today: Day | null;
   loginError: string;
   dialog: Dialog;
@@ -33,7 +35,6 @@ interface State {
   statusMenu: boolean;
   toast: string;
   devs: { desk: boolean; pc: boolean };
-  anns: Announcement[];
   setView: (v: View) => void;
   setCur: (c: string) => void;
   setQuery: (q: string) => void;
@@ -41,7 +42,6 @@ interface State {
   toggleStatusMenu: (open?: boolean) => void;
   showToast: (m: string) => void;
   toggleDev: (k: 'desk' | 'pc') => void;
-  ack: (id: number) => void;
 }
 
 
@@ -56,14 +56,15 @@ function loginMessage(e: unknown): string {
 }
 
 export const useApp = create<State>((set, get) => ({
-  phase: 'loading', user: null, today: null, loginError: '', dialog: null,
+  phase: 'loading', user: null, roles: ['employee'], today: null, loginError: '', dialog: null,
 
   async bootstrap() {
     try {
       if (await api.refresh()) {
         const r = await api.me();
-        set({ phase: 'in', user: r.user, today: r.attendance, presence: 'on' });
+        set({ phase: 'in', user: r.user, roles: r.roles, today: r.attendance, presence: 'on' });
         useChat.getState().start(r.user.id);
+        void useAnn.getState().load();
         return;
       }
     } catch { /* fall through to login */ }
@@ -77,6 +78,8 @@ export const useApp = create<State>((set, get) => ({
       set({ phase: 'in', user: r.user, today: r.attendance, presence: 'on', view: 'chat',
         dialog: { kind: 'arrival', resumed: !r.new_clock_in } });
       useChat.getState().start(r.user.id);
+      void api.me().then((m) => set({ roles: m.roles })).catch(() => undefined);
+      void useAnn.getState().load();
     } catch (e) {
       set({ loginError: loginMessage(e) });
     }
@@ -95,8 +98,9 @@ export const useApp = create<State>((set, get) => ({
       const name = get().user?.display_name.split(' ')[0] ?? '';
       const r = await api.logout(reason);
       useChat.getState().stop();
+      useAnn.getState().reset();
       useCalls.getState().reset();
-      set({ phase: 'out', user: null, today: null,
+      set({ phase: 'out', user: null, roles: ['employee'], today: null,
         dialog: { kind: 'bye', time: r.clock_out, durationMin: r.duration_min, name } });
       return null;
     } catch (e) {
@@ -107,7 +111,7 @@ export const useApp = create<State>((set, get) => ({
 
   view: 'chat', cur: '', query: '', presence: 'on', statusMenu: false, toast: '',
   devs: { desk: true, pc: true },
-  anns: initialAnnouncements(),
+  
 
   setView(v) {
     set({ view: v, query: '' });
@@ -127,6 +131,5 @@ export const useApp = create<State>((set, get) => ({
   },
   toggleDev: (k) => set((s) => ({ devs: { ...s.devs, [k]: !s.devs[k] } })),
 
-  ack: (id) => set((s) => ({ anns: s.anns.map((a) => (a.id === id ? { ...a, ack: true } : a)) })),
 
 }));

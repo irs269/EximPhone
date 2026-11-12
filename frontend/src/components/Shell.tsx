@@ -3,6 +3,9 @@ import { useEffect, useState } from 'react';
 import { history, searchMessages, type Message } from '../api/client';
 import { convTitle, useChat } from '../store/chat';
 import { useCalls } from '../store/calls';
+import { useAnn } from '../store/ann';
+import { Team } from '../views/Team';
+import { Audit } from '../views/Audit';
 import { NewChatDialog } from './NewChatDialog';
 import { useApp, type View } from '../store/app';
 import { t } from '../i18n';
@@ -24,17 +27,21 @@ const nav: { v: View; icon: IconName; label: Parameters<typeof t>[0] }[] = [
   { v: 'dir', icon: 'dir', label: 'nav.directory' },
   { v: 'att', icon: 'clock', label: 'nav.attendance' },
   { v: 'ann', icon: 'ann', label: 'nav.announcements' },
+  { v: 'team', icon: 'chart', label: 'nav.team' },
+  { v: 'audit', icon: 'shield', label: 'nav.audit' },
 ];
+const visible = (v: View, roles: string[]) =>
+  v === 'team' ? roles.includes('hr') || roles.includes('manager') : v === 'audit' ? roles.includes('auditor') : true;
 
 function Rail() {
-  const { view, setView, askLogout, user, presence, toggleStatusMenu, anns } = useApp();
+  const { view, setView, askLogout, user, presence, toggleStatusMenu, roles } = useApp();
   const unread = useChat((c) => c.convs.reduce((n, x) => n + x.unread, 0));
-  const pendingAnn = anns.filter((a) => !a.ack).length;
+  const pendingAnn = useAnn((a) => a.items.filter((x) => !x.acked_at).length);
   const badge = (v: View) => (v === 'chat' ? unread : v === 'ann' ? pendingAnn : 0);
   return (
     <nav className="rail" aria-label="Navigation principale">
       <div className="mono" title="Exim Bank" role="img" aria-label="Exim Bank" />
-      {nav.map(({ v, icon, label }) => (
+      {nav.filter((n) => visible(n.v, roles)).map(({ v, icon, label }) => (
         <button key={v} className={view === v ? 'on' : ''} aria-current={view === v ? 'page' : undefined} onClick={() => setView(v)}>
           <Icon name={icon} />{t(label)}
           {badge(v) > 0 && <span className="badge" aria-label={`${badge(v)} non lus`}>{badge(v)}</span>}
@@ -75,7 +82,8 @@ function StatusMenu() {
 function ListPane() {
   const s = useApp();
   const q = s.query.toLowerCase();
-  const titles: Record<View, Parameters<typeof t>[0]> = { chat: 'nav.messages', phone: 'nav.calls', dir: 'nav.directory', att: 'nav.attendance', ann: 'nav.announcements' };
+  const titles: Record<View, Parameters<typeof t>[0]> = { chat: 'nav.messages', phone: 'nav.calls', dir: 'nav.directory', att: 'nav.attendance', ann: 'nav.announcements', team: 'nav.team', audit: 'nav.audit' };
+  const annItems = useAnn((a) => a.items);
   const chat = useChat();
   const calls = useCalls();
   const [hits, setHits] = useState<Message[]>([]);
@@ -131,13 +139,15 @@ function ListPane() {
         </button>))] : [];
     });
   } else if (s.view === 'ann') {
-    items = s.anns.map((a) => (
+    items = annItems.map((a) => (
       <button key={a.id} className="it" onClick={() => document.getElementById('a' + a.id)?.scrollIntoView({ behavior: 'smooth' })}>
-        <div className="av" style={{ background: a.urgent ? 'var(--alert)' : 'var(--gold)' }}><Icon name="grid" size={16} /></div>
-        <div className="t"><div className="n">{a.tag}<small>{a.date.split(',')[0]}</small></div><div className="s">{a.title}</div></div>
-        {!a.ack && <span className="cnt">!</span>}
+        <div className="av" style={{ background: a.level === 'urgent' ? 'var(--alert)' : 'var(--gold)' }}><Icon name="grid" size={16} /></div>
+        <div className="t"><div className="n">{a.level === 'urgent' ? t('ann.urgent') : t('ann.normal')}<small>{hm(a.created_at)}</small></div><div className="s">{a.title}</div></div>
+        {!a.acked_at && <span className="cnt">!</span>}
       </button>
     ));
+  } else if (s.view === 'team' || s.view === 'audit') {
+    items = [];
   } else {
     items = [<div className="sec" key="h">{t('list.month')}</div>, ...(days.data?.days ?? []).map((d) => {
       const st = dayStatus(d);
@@ -182,11 +192,14 @@ export function Shell() {
           {view === 'dir' && <Directory />}
           {view === 'att' && <Attendance />}
           {view === 'ann' && <Announcements />}
+          {view === 'team' && <Team />}
+          {view === 'audit' && <Audit />}
         </main>
       </div>
       <StatusMenu />
       <CallOverlay />
       <NewChatDialog />
+      <UrgentDialog />
       <Dialogs />
       <div id="toast" className={toast ? 'show' : ''} role="status" aria-live="polite">{toast}</div>
     </>
@@ -194,3 +207,28 @@ export function Shell() {
 }
 
 
+
+function UrgentDialog() {
+  const urgent = useAnn((a) => a.urgent);
+  const ack = useAnn((a) => a.ack);
+  const dismiss = useAnn((a) => a.dismissUrgent);
+  if (!urgent) return null;
+  return (
+    <div id="dlg" role="presentation">
+      <div className="dbox" role="alertdialog" aria-modal="true" aria-label={t('ann.urgentTitle')}>
+        <div className="dh" style={{ background: 'linear-gradient(150deg, var(--alert-dark), var(--alert))' }}>
+          <div className="ck" style={{ background: 'var(--surface)', color: 'var(--alert)' }} aria-hidden>!</div>
+          <b>{t('ann.urgentTitle')}</b><span>{urgent.author}</span>
+        </div>
+        <div className="bd" style={{ textAlign: 'left' }}>
+          <h4 style={{ marginBottom: 8 }}>{urgent.title}</h4>
+          <p style={{ whiteSpace: 'pre-wrap', lineHeight: 1.5 }}>{urgent.body}</p>
+        </div>
+        <div className="bt">
+          <button className="btn ghost" onClick={dismiss}>{t('out.cancel')}</button>
+          <button className="btn" autoFocus onClick={() => void ack(urgent.id)}>{t('ann.ack')}</button>
+        </div>
+      </div>
+    </div>
+  );
+}

@@ -57,6 +57,7 @@ func (a *app) routes(r chi.Router) {
 		a.chatRoutes(r)
 		a.callRoutes(r)
 		a.adminRoutes(r)
+		a.rbacRoutes(r)
 		r.Get("/me", a.me)
 		r.Get("/me/attendance", a.history)
 		r.Get("/auth/logout-summary", a.logoutSummary)
@@ -282,7 +283,7 @@ func (a *app) me(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	d, _ := a.st.openDay(r.Context(), u.ID)
-	writeJSON(w, http.StatusOK, map[string]any{"user": u, "attendance": d})
+	writeJSON(w, http.StatusOK, map[string]any{"user": u, "attendance": d, "roles": a.rolesOf(r.Context(), u.ID)})
 }
 
 // logoutSummary feeds the confirmation screen: arrival, departure (now), duration.

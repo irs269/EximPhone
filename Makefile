@@ -27,9 +27,10 @@ seed: ## Apply db/seed/*.sql (LDAP demo users are loaded automatically by ldap-m
 test:
 	docker run --rm -v "$(CURDIR)/services:/src" -w /src golang:1.23-alpine go test ./...
 
-e2e: ## Chat, presence and call signaling acceptance tests (needs make dev; local self-signed cert only)
+e2e: ## Chat, call signaling and HR/announcement acceptance tests (run make seed first) (needs make dev; local self-signed cert only)
 	NODE_TLS_REJECT_UNAUTHORIZED=0 node tests/e2e/realtime.mjs https://127.0.0.1
 	NODE_TLS_REJECT_UNAUTHORIZED=0 node tests/e2e/calls.mjs https://127.0.0.1
+	NODE_TLS_REJECT_UNAUTHORIZED=0 node tests/e2e/hr.mjs https://127.0.0.1
 
 e2e-phones: ## Desk phone integration test (SIP softphone + WebRTC client; needs make dev)
 	sh scripts/e2e-phones.sh

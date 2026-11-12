@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import * as api from '../api/client';
 import type { Conversation, DirUser, Message } from '../api/client';
 import { useCalls } from './calls';
+import { useAnn } from './ann';
 import { connectSocket, disconnectSocket, sendSocket, type ServerEvent } from '../api/socket';
 
 interface ChatState {
@@ -92,6 +93,9 @@ export const useChat = create<ChatState>((set, get) => {
         break;
       case 'call_incoming': case 'call_answered': case 'call_ended': case 'call_hold': case 'call_transferred':
         useCalls.getState().onEvent(type, data);
+        break;
+      case 'announcement':
+        useAnn.getState().onEvent(data);
         break;
       case 'typing':
         if (data.user_id === s.me) break;
