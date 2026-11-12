@@ -41,7 +41,11 @@ func NewRouter(name string) chi.Router {
 
 // Run starts the service. With -healthcheck it probes the local /healthz and
 // exits (used by Docker HEALTHCHECK, since distroless images ship no shell).
-func Run(name string) {
+func Run(name string) { RunWith(name, nil, nil) }
+
+// RunWith is Run plus an optional route mounter and a background job started
+// once the server is up (it receives a context cancelled on shutdown).
+func RunWith(name string, mount func(chi.Router), job func(context.Context, *slog.Logger)) {
 	healthcheck := flag.Bool("healthcheck", false, "probe /healthz and exit")
 	flag.Parse()
 
@@ -60,14 +64,21 @@ func Run(name string) {
 	}
 	log := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: level})).With("service", name)
 
+	router := NewRouter(name)
+	if mount != nil {
+		mount(router)
+	}
 	srv := &http.Server{
 		Addr:              addr,
-		Handler:           NewRouter(name),
+		Handler:           router,
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
+	if job != nil {
+		go job(ctx, log)
+	}
 
 	go func() {
 		log.Info("listening", "addr", addr)

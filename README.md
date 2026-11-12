@@ -4,7 +4,9 @@ Internal communication and attendance platform for Exim Bank. Full spec: [docs/P
 
 ## Status
 
-Phase 0 (foundation) - Docker stack with Go service skeletons, Nginx TLS, PostgreSQL, Redis, LDAP mock.
+Phase 0 (foundation) done. Phase 1 (auth + attendance API) done: LDAP login = clock-in, network check, late/early rules, logout = clock-out, midnight auto-close by the worker. The attendance screen comes with the React frontend (phase 2).
+
+Try it (dev): `POST https://localhost/api/auth/login` with `{"username":"asaid","password":"Demo-Passw0rd!"}`. Rules: [docs/attendance-rules.md](docs/attendance-rules.md).
 
 ## Prerequisites
 
