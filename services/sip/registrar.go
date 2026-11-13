@@ -50,6 +50,10 @@ func (s *service) failed(ctx context.Context, ip string) {
 func (s *service) authenticate(req *sip.Request, tx sip.ServerTransaction) (*device, bool) {
 	ctx := context.Background()
 	ip := sourceIP(req)
+	if s.cfg.requireTLS && !strings.EqualFold(req.Transport(), "tls") {
+		s.reply(req, tx, sip.StatusForbidden, "TLS required") // credentials must never cross the network in clear
+		return nil, false
+	}
 	if n, _ := s.st.rdb.Get(ctx, "sip:fail:"+ip).Int(); n >= maxFailures {
 		s.reply(req, tx, sip.StatusForbidden, "Forbidden") // too many failures from this address
 		return nil, false

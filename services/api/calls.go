@@ -151,7 +151,8 @@ func (a *app) answerCall(w http.ResponseWriter, r *http.Request) {
 	}
 	a.enterCall(ctx, caller)
 	a.enterCall(ctx, uid)
-	a.hub.publish(ctx, []int64{caller, uid}, "call_answered", map[string]any{"call_id": id, "via": "pc"})
+	recorded := a.maybeRecord(ctx, id, caller, uid)
+	a.hub.publish(ctx, []int64{caller, uid}, "call_answered", map[string]any{"call_id": id, "via": "pc", "recorded": recorded})
 	a.sipCommand(ctx, map[string]any{"type": "pc_answered", "call_id": id}) // cancel the desk phones that were ringing
 	writeJSON(w, 200, map[string]string{"id": id, "state": "active"})
 }

@@ -1,4 +1,4 @@
-//go:build e2e
+//go:build e2e || load
 
 // End-to-end tests of the phone integration against a running stack (make dev):
 // a real SIP softphone (sipgo) and a real WebRTC client (pion) play the desk phone and the PC.
@@ -7,8 +7,10 @@ package e2e
 import (
 	"bytes"
 	"context"
+	cryptorand "crypto/rand"
 	"crypto/tls"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -26,6 +28,7 @@ import (
 	"github.com/emiago/sipgo"
 	"github.com/emiago/sipgo/sip"
 	"github.com/pion/rtp"
+	"github.com/pion/srtp/v3"
 	"github.com/pion/webrtc/v4"
 )
 
@@ -158,6 +161,13 @@ func (p *pcUser) wait(typ string, match func(map[string]any) bool) map[string]an
 	}
 }
 
+// reset forgets the events received so far, so the next wait only sees new ones.
+func (p *pcUser) reset() {
+	p.mu.Lock()
+	p.seen = nil
+	p.mu.Unlock()
+}
+
 func (p *pcUser) has(typ string, match func(map[string]any) bool) bool {
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -287,11 +297,18 @@ type softphone struct {
 	byes     int
 	lastAuth string // last challenge header, reused to pre-authenticate INVITEs
 	pending  map[string]*incoming
+
+	srtp      bool   // offer and use SRTP (SDES)
+	myKey     []byte // our SRTP key material
+	sendCtx   *srtp.Context
+	recvCtx   *srtp.Context
+	tlsMode   bool // register over TLS (port 5061)
+	wireClear int  // packets seen on the wire that were NOT protected while SRTP was on
 }
 
 func newSoftphone(t *testing.T, ext, user, pass, alg string, port int) *softphone {
 	t.Helper()
-	ua, err := sipgo.NewUA(sipgo.WithUserAgent("e2e-softphone"))
+	ua, err := sipgo.NewUA(sipgo.WithUserAgent("e2e-softphone"), sipgo.WithUserAgenTLSConfig(&tls.Config{InsecureSkipVerify: true})) //nolint:gosec // local dev certificate
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -415,6 +432,10 @@ func (p *softphone) register(expires int) int {
 			req.AppendHeader(sip.NewHeader("Authorization", auth))
 		}
 		req.SetDestination(sipHost)
+		if p.tlsMode {
+			req.SetTransport("TLS")
+			req.SetDestination(strings.Split(sipHost, ":")[0] + ":5061")
+		}
 		ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
 		tx, err := p.client.TransactionRequest(ctx, req)
 		if err != nil {
@@ -449,7 +470,13 @@ func (p *softphone) invite(toExt string) (*sipgo.DialogClientSession, *sdpmini.A
 	uri := sip.Uri{Scheme: "sip", User: toExt, Host: domain}
 	recipient := sip.Uri{Scheme: "sip", User: toExt, Host: strings.Split(sipHost, ":")[0], Port: 5060}
 	_ = uri
-	sdp := sdpmini.Build("127.0.0.1", p.rtp.LocalAddr().(*net.UDPAddr).Port, time.Now().UnixNano()/1e6)
+	rtpPort := p.rtp.LocalAddr().(*net.UDPAddr).Port
+	sdp := sdpmini.Build("127.0.0.1", rtpPort, time.Now().UnixNano()/1e6)
+	if p.srtp {
+		p.myKey = make([]byte, sdpmini.SRTPKeyLen)
+		_, _ = cryptorand.Read(p.myKey)
+		sdp = sdpmini.BuildSecure("127.0.0.1", rtpPort, time.Now().UnixNano()/1e6, p.myKey)
+	}
 	from := &sip.FromHeader{Address: sip.Uri{Scheme: "sip", User: p.ext, Host: domain}, Params: sip.NewParams()}
 	from.Params.Add("tag", sip.GenerateTagN(12))
 	headers := []sip.Header{from, &sip.ToHeader{Address: uri, Params: sip.NewParams()}, sip.NewHeader("Content-Type", "application/sdp")}
@@ -475,6 +502,12 @@ func (p *softphone) invite(toExt string) (*sipgo.DialogClientSession, *sdpmini.A
 	if err != nil {
 		p.t.Fatalf("answer SDP: %v", err)
 	}
+	if p.srtp {
+		if !answer.Secure || answer.Key == nil {
+			p.t.Fatalf("the server answered a SRTP offer without SRTP")
+		}
+		p.sendCtx, p.recvCtx = p.ctx(p.myKey), p.ctx(answer.Key)
+	}
 	if err := dlg.Ack(ctx); err != nil {
 		p.t.Fatalf("ack: %v", err)
 	}
@@ -496,6 +529,13 @@ func (p *softphone) sendRTP(to string, marker byte, stop <-chan struct{}) {
 			case <-tick.C:
 				seq++
 				b, _ := (&rtp.Packet{Header: rtp.Header{Version: 2, PayloadType: 0, SequenceNumber: seq, Timestamp: uint32(seq) * 160, SSRC: 4242}, Payload: bytes.Repeat([]byte{marker}, 160)}).Marshal()
+				if p.sendCtx != nil {
+					enc, err := p.sendCtx.EncryptRTP(nil, b, nil)
+					if err != nil {
+						continue
+					}
+					b = enc
+				}
 				_, _ = p.rtp.WriteToUDP(b, addr)
 			}
 		}
@@ -512,8 +552,19 @@ func (p *softphone) expectRTP(marker byte) {
 		if err != nil {
 			p.t.Fatalf("phone %s never received audio marker %#x", p.ext, marker)
 		}
+		raw := buf[:n]
+		if p.recvCtx != nil {
+			if bytes.Contains(raw, bytes.Repeat([]byte{marker}, 20)) {
+				p.t.Fatalf("audio is visible in clear on the wire although SRTP is on")
+			}
+			plain, err := p.recvCtx.DecryptRTP(nil, raw, nil)
+			if err != nil {
+				continue
+			}
+			raw = plain
+		}
 		var pkt rtp.Packet
-		if pkt.Unmarshal(buf[:n]) == nil && len(pkt.Payload) > 0 && pkt.Payload[0] == marker {
+		if pkt.Unmarshal(raw) == nil && len(pkt.Payload) > 0 && pkt.Payload[0] == marker {
 			if pkt.PayloadType != 0 {
 				p.t.Fatalf("phone received payload type %d, want 0", pkt.PayloadType)
 			}
@@ -521,3 +572,27 @@ func (p *softphone) expectRTP(marker byte) {
 		}
 	}
 }
+
+func (p *softphone) ctx(key []byte) *srtp.Context {
+	c, err := srtp.CreateContext(key[:16], key[16:], srtp.ProtectionProfileAes128CmHmacSha1_80)
+	if err != nil {
+		p.t.Fatal(err)
+	}
+	return c
+}
+
+// answerFor builds the phone's answer to the server's offer: SRTP when both sides support it.
+func (p *softphone) answerFor(offer sdpmini.Audio) []byte {
+	port := p.rtp.LocalAddr().(*net.UDPAddr).Port
+	id := time.Now().UnixNano() / 1e6
+	if p.srtp && offer.Secure && offer.Key != nil {
+		p.myKey = make([]byte, sdpmini.SRTPKeyLen)
+		_, _ = cryptorand.Read(p.myKey)
+		p.sendCtx, p.recvCtx = p.ctx(p.myKey), p.ctx(offer.Key)
+		return sdpmini.BuildSecure("127.0.0.1", port, id, p.myKey)
+	}
+	p.sendCtx, p.recvCtx = nil, nil
+	return sdpmini.Build("127.0.0.1", port, id)
+}
+
+func asResp(err error, target **sipgo.ErrDialogResponse) bool { return errors.As(err, target) }

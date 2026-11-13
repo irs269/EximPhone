@@ -5,6 +5,7 @@ package main
 import (
 	"context"
 	"crypto/subtle"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"log"
@@ -80,18 +81,24 @@ func routes(m *manager, jwtSecret []byte, internalToken string) func(chi.Router)
 			}
 			var body struct {
 				CallID string `json:"call_id"`
+				UserID int64  `json:"user_id"`
+				SRTP   bool   `json:"srtp"`
 			}
 			if json.NewDecoder(http.MaxBytesReader(w, req.Body, 1024)).Decode(&body) != nil || body.CallID == "" {
 				http.Error(w, `{"error":"invalid request"}`, http.StatusBadRequest)
 				return
 			}
-			l, err := m.newSIPLeg(body.CallID)
+			l, err := m.newSIPLeg(body.CallID, body.UserID, body.SRTP)
 			if err != nil {
 				http.Error(w, `{"error":"no free port"}`, http.StatusServiceUnavailable)
 				return
 			}
 			w.Header().Set("Content-Type", "application/json")
-			_ = json.NewEncoder(w).Encode(map[string]any{"leg_id": l.id, "port": l.port})
+			out := map[string]any{"leg_id": l.id, "port": l.port}
+			if l.secure {
+				out["srtp_key"] = base64.StdEncoding.EncodeToString(l.srtpKey)
+			}
+			_ = json.NewEncoder(w).Encode(out)
 		})
 		r.Post("/legs/{id}/activate", func(w http.ResponseWriter, req *http.Request) {
 			if !internal(w, req) {
@@ -99,7 +106,8 @@ func routes(m *manager, jwtSecret []byte, internalToken string) func(chi.Router)
 			}
 			l := m.sipLeg(chi.URLParam(req, "id"))
 			var body struct {
-				Remote string `json:"remote"`
+				Remote  string `json:"remote"`
+				SRTPKey string `json:"srtp_key"`
 			}
 			if l == nil || json.NewDecoder(http.MaxBytesReader(w, req.Body, 1024)).Decode(&body) != nil {
 				http.Error(w, `{"error":"unknown leg"}`, http.StatusNotFound)
@@ -110,8 +118,12 @@ func routes(m *manager, jwtSecret []byte, internalToken string) func(chi.Router)
 				http.Error(w, `{"error":"invalid remote"}`, http.StatusBadRequest)
 				return
 			}
-			if err := l.activate(addr); errors.Is(err, errRoomFull) {
+			remoteKey, _ := base64.StdEncoding.DecodeString(body.SRTPKey)
+			if err := l.activate(addr, remoteKey); errors.Is(err, errRoomFull) {
 				http.Error(w, `{"error":"room full"}`, http.StatusConflict)
+				return
+			} else if errors.Is(err, errBadKey) {
+				http.Error(w, `{"error":"srtp key required"}`, http.StatusBadRequest)
 				return
 			}
 			w.WriteHeader(http.StatusNoContent)
@@ -123,6 +135,20 @@ func routes(m *manager, jwtSecret []byte, internalToken string) func(chi.Router)
 			if l := m.sipLeg(chi.URLParam(req, "id")); l != nil {
 				l.close()
 			}
+			w.WriteHeader(http.StatusNoContent)
+		})
+
+		// The api marks a call for recording (department rule), identifying who is the caller.
+		r.Post("/calls/{id}/record", func(w http.ResponseWriter, req *http.Request) {
+			if !internal(w, req) {
+				return
+			}
+			var cfg recordingConfig
+			if json.NewDecoder(http.MaxBytesReader(w, req.Body, 512)).Decode(&cfg) != nil || cfg.CallerUserID == 0 {
+				http.Error(w, `{"error":"invalid request"}`, http.StatusBadRequest)
+				return
+			}
+			m.setRecording(chi.URLParam(req, "id"), cfg)
 			w.WriteHeader(http.StatusNoContent)
 		})
 
@@ -151,6 +177,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	m.recEnv = recorderFromEnv(logger)
 	server.RunWith("media", routes(m, []byte(secret), os.Getenv("INTERNAL_TOKEN")), func(ctx context.Context, l *slog.Logger) {
 		t := time.NewTicker(30 * time.Second)
 		defer t.Stop()

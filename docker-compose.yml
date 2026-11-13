@@ -11,6 +11,12 @@ services:
   nginx:
     build: {context: ., dockerfile: frontend/Dockerfile}
     image: eximphone-nginx
+    environment:
+      # Per-IP request limits (raise them only for load tests: see docs/deployment.md)
+      NGINX_LOGIN_RATE: ${NGINX_LOGIN_RATE:-5r/s}
+      NGINX_API_RATE: ${NGINX_API_RATE:-50r/s}
+      NGINX_LOGIN_BURST: ${NGINX_LOGIN_BURST:-10}
+      NGINX_API_BURST: ${NGINX_API_BURST:-200}
     restart: unless-stopped
     ports: ["443:443"]
     volumes:
@@ -47,6 +53,7 @@ services:
       MEDIA_URL: http://media:8080
       SIP_KEY: ${SIP_KEY}
       SIP_DOMAIN: ${SIP_DOMAIN}
+      RECORDING_KEY: ${RECORDING_KEY}
       LDAP_URL: ${LDAP_URL}
       LDAP_BASE_DN: ${LDAP_BASE_DN}
       LDAP_USER_ATTR: ${LDAP_USER_ATTR}
@@ -75,6 +82,8 @@ services:
       SIP_KEY: ${SIP_KEY}
       SIP_DOMAIN: ${SIP_DOMAIN}
       PUBLIC_IP: ${PUBLIC_IP}
+      SIP_REQUIRE_TLS: ${SIP_REQUIRE_TLS:-false}
+      SIP_REQUIRE_SRTP: ${SIP_REQUIRE_SRTP:-false}
       SIP_TLS_CERT: /certs/server.crt
       SIP_TLS_KEY: /certs/server.key
       API_URL: http://api:8080
@@ -85,11 +94,19 @@ services:
     build: {context: ./services, args: {SERVICE: media}}
     # RTP needs real source addresses and a wide UDP range; in production use network_mode: host (see docs/deployment.md).
     ports: ["10000-10200:10000-10200/udp"]
+    networks: [back, data]
     environment:
       <<: *go-env
       JWT_SECRET: ${JWT_SECRET}
       INTERNAL_TOKEN: ${INTERNAL_TOKEN}
       MEDIA_PUBLIC_IP: ${PUBLIC_IP}
+      RECORDING_KEY: ${RECORDING_KEY}
+      S3_ENDPOINT: http://garage:3900
+      S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID}
+      S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY}
+      API_URL: http://api:8080
+    tmpfs: ["/tmp"]
+    depends_on: {garage: {condition: service_healthy}}
 
   turn:
     <<: *go-service
@@ -110,6 +127,8 @@ services:
       DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?sslmode=disable
       SIP_KEY: ${SIP_KEY}
       PUBLIC_IP: ${PUBLIC_IP}
+      SIP_REQUIRE_TLS: ${SIP_REQUIRE_TLS:-false}
+      SIP_REQUIRE_SRTP: ${SIP_REQUIRE_SRTP:-false}
 
   worker:
     <<: *go-service
@@ -126,6 +145,10 @@ services:
       LDAP_BIND_DN: ${LDAP_BIND_DN}
       LDAP_BIND_PASSWORD: ${LDAP_BIND_PASSWORD}
       INITIAL_IT_ADMINS: ${INITIAL_IT_ADMINS:-}
+      S3_ENDPOINT: http://garage:3900
+      S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID}
+      S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY}
+      RECORDING_RETENTION_DAYS: ${RECORDING_RETENTION_DAYS:-365}
 
   postgres:
     image: postgres:16-alpine

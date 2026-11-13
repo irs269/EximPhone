@@ -22,6 +22,8 @@ import (
 type config struct {
 	domain, publicIP string
 	nonceSecret      []byte
+	requireTLS       bool // refuse REGISTER and INVITE that do not arrive over TLS
+	requireSRTP      bool // phones must use SRTP (SDES); plain RTP offers are refused
 }
 
 type service struct {
@@ -78,7 +80,8 @@ func main() {
 	secret := must("JWT_SECRET")
 
 	s := &service{
-		cfg: config{domain: env("SIP_DOMAIN", "exim.local"), publicIP: env("PUBLIC_IP", "127.0.0.1"), nonceSecret: []byte(secret)},
+		cfg: config{domain: env("SIP_DOMAIN", "exim.local"), publicIP: env("PUBLIC_IP", "127.0.0.1"), nonceSecret: []byte(secret),
+			requireTLS: env("SIP_REQUIRE_TLS", "") == "true", requireSRTP: env("SIP_REQUIRE_SRTP", "") == "true"},
 		st:  &store{db: db, rdb: redis.NewClient(ropt), box: box},
 		api: newAPIClient(env("API_URL", "http://api:8080"), env("MEDIA_URL", "http://media:8080"), must("INTERNAL_TOKEN")),
 		log: logger, sessions: map[string]*session{}, byCallID: map[string]*session{},

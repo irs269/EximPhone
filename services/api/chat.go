@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -614,11 +615,21 @@ func (a *app) upload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	key := fmt.Sprintf("conversation-%d/%s", convID, id)
-	if _, err := a.s3.PutObject(ctx, attachBucket, key, file, hdr.Size, minio.PutObjectOptions{ContentType: detected}); err != nil {
+	plain, err := io.ReadAll(io.LimitReader(file, maxUpload+1))
+	if err != nil || int64(len(plain)) > maxUpload {
+		apiError(w, http.StatusRequestEntityTooLarge, "file too large (20 MB max)")
+		return
+	}
+	sealed, err := a.box.Seal(plain, []byte(id)) // encrypted at rest; the attachment id is bound as additional data
+	if err != nil {
+		apiError(w, 500, "internal error")
+		return
+	}
+	if _, err := a.s3.PutObject(ctx, attachBucket, key, bytes.NewReader(sealed), int64(len(sealed)), minio.PutObjectOptions{ContentType: "application/octet-stream"}); err != nil {
 		apiError(w, 502, "storage unavailable")
 		return
 	}
-	_, _ = a.st.db.Exec(ctx, `UPDATE attachments SET s3_key=$2 WHERE id=$1::uuid`, id, key)
+	_, _ = a.st.db.Exec(ctx, `UPDATE attachments SET s3_key=$2, encrypted=TRUE WHERE id=$1::uuid`, id, key)
 	writeJSON(w, 200, attachmentJSON{ID: id, Filename: name, Mime: detected, Size: hdr.Size})
 }
 
@@ -626,8 +637,9 @@ func (a *app) download(w http.ResponseWriter, r *http.Request) {
 	ctx, uid := r.Context(), userID(r)
 	var conv, size int64
 	var name, mt, key string
-	err := a.st.db.QueryRow(ctx, `SELECT conversation_id, filename, mime, size, s3_key FROM attachments WHERE id=$1::uuid`, chi.URLParam(r, "id")).
-		Scan(&conv, &name, &mt, &size, &key)
+	var encrypted bool
+	err := a.st.db.QueryRow(ctx, `SELECT conversation_id, filename, mime, size, s3_key, encrypted FROM attachments WHERE id=$1::uuid`, chi.URLParam(r, "id")).
+		Scan(&conv, &name, &mt, &size, &key, &encrypted)
 	if err != nil {
 		apiError(w, 404, "not found")
 		return
@@ -642,9 +654,23 @@ func (a *app) download(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer obj.Close()
+	var reader io.Reader = obj
+	if encrypted {
+		sealed, err := io.ReadAll(io.LimitReader(obj, maxUpload+1024))
+		if err != nil {
+			apiError(w, 502, "storage unavailable")
+			return
+		}
+		plain, err := a.box.Open(sealed, []byte(chi.URLParam(r, "id")))
+		if err != nil {
+			apiError(w, 500, "attachment cannot be decrypted")
+			return
+		}
+		reader = bytes.NewReader(plain)
+	}
 	w.Header().Set("Content-Type", mt)
 	w.Header().Set("Content-Length", strconv.FormatInt(size, 10))
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.Header().Set("Content-Disposition", mime.FormatMediaType("attachment", map[string]string{"filename": name}))
-	_, _ = io.Copy(w, obj)
+	_, _ = io.Copy(w, reader)
 }

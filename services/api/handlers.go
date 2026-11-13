@@ -42,6 +42,7 @@ type app struct {
 	hub       *hub
 	box       *crypto.Box
 	sipBox    *crypto.Box
+	recBox    *crypto.Box
 	s3        *minio.Client
 	jwtSecret []byte
 	now       func() time.Time
@@ -58,6 +59,7 @@ func (a *app) routes(r chi.Router) {
 		a.callRoutes(r)
 		a.adminRoutes(r)
 		a.rbacRoutes(r)
+		a.recordingRoutes(r)
 		r.Get("/me", a.me)
 		r.Get("/me/attendance", a.history)
 		r.Get("/auth/logout-summary", a.logoutSummary)

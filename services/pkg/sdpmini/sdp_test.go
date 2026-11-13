@@ -40,3 +40,29 @@ func TestBuildRoundTrip(t *testing.T) {
 		t.Fatalf("unexpected %+v", a)
 	}
 }
+
+func TestSecureOfferRoundTrip(t *testing.T) {
+	key := make([]byte, SRTPKeyLen)
+	for i := range key {
+		key[i] = byte(i + 1)
+	}
+	a, err := Parse(BuildSecure("192.0.2.1", 10150, 7, key))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !a.Secure || len(a.Key) != SRTPKeyLen || a.Key[0] != 1 || a.Key[29] != 30 {
+		t.Fatalf("unexpected %+v", a)
+	}
+	plain, _ := Parse(Build("192.0.2.1", 10150, 7))
+	if plain.Secure || plain.Key != nil {
+		t.Fatal("a plain offer must not look secure")
+	}
+}
+
+func TestCryptoLineWithWrongSizeIsIgnored(t *testing.T) {
+	sdp := "v=0\r\nc=IN IP4 1.2.3.4\r\nm=audio 4000 RTP/SAVP 0\r\na=crypto:1 AES_CM_128_HMAC_SHA1_80 inline:AAAA\r\n"
+	a, err := Parse([]byte(sdp))
+	if err != nil || !a.Secure || a.Key != nil {
+		t.Fatalf("%+v %v", a, err)
+	}
+}

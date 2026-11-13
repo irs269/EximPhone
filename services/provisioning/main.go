@@ -122,6 +122,10 @@ func main() {
 			return nil, err
 		}
 		p.Password, p.Server, p.Port = string(plain), server_, port
+		if os.Getenv("SIP_REQUIRE_TLS") == "true" {
+			p.TLS, p.Port = true, 5061
+		}
+		p.SRTP = os.Getenv("SIP_REQUIRE_SRTP") == "true"
 		return &p, nil
 	}
 

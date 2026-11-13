@@ -103,3 +103,18 @@ func TestRateLimit(t *testing.T) {
 		t.Fatalf("last status %d, want 429", last)
 	}
 }
+
+func TestMandatoryTLSAndSRTPAreWrittenIntoTheConfig(t *testing.T) {
+	p := phone{Vendor: "yealink", Extension: "2001", DisplayName: "A", SIPUser: "2001", Password: "x", Server: "h", Port: 5061, TLS: true, SRTP: true}
+	out, _ := render(p)
+	for _, want := range []string{"transport_type = 2", "srtp_encryption = 2", "sip_server.1.port = 5061"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("missing %q in:\n%s", want, out)
+		}
+	}
+	p.TLS, p.SRTP, p.Port = false, false, 5060
+	out, _ = render(p)
+	if !strings.Contains(out, "transport_type = 0") || !strings.Contains(out, "srtp_encryption = 0") {
+		t.Errorf("plain defaults expected:\n%s", out)
+	}
+}

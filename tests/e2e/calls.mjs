@@ -49,8 +49,13 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const A = await login('asaid'), B = await login('oabdallah'), C = await login('mjuma');
 const wa = await connect(A), wb = await connect(B), wc = await connect(C);
-// start from a clean slate (previous runs, other tests)
-for (const u of [A, B, C]) { await http(u.token, 'PUT', '/presence', { status: 'on' }); }
+// start from a clean slate (previous runs, other tests): end any call left open, reset the status
+for (const u of [A, B, C]) {
+  for (const c of ((await http(u.token, 'GET', '/calls')).json?.calls ?? [])) {
+    if (c.state !== 'ended') await http(u.token, 'POST', `/calls/${c.id}/hangup`);
+  }
+  await http(u.token, 'PUT', '/presence', { status: 'on' });
+}
 await sleep(200);
 
 // ---- ring + answer

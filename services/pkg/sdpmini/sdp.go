@@ -3,6 +3,7 @@
 package sdpmini
 
 import (
+	"encoding/base64"
 	"fmt"
 	"strconv"
 	"strings"
@@ -21,7 +22,12 @@ type Audio struct {
 	Codecs  []int
 	DTMFPT  int // payload type of telephone-event, 0 if not offered
 	Offered map[int]bool
+	Secure  bool   // RTP/SAVP: the phone wants SRTP
+	Key     []byte // SDES master key + salt (30 bytes, AES_CM_128_HMAC_SHA1_80) of the sender, nil if absent
 }
+
+// SRTPKeyLen is the SDES key material length for AES_CM_128_HMAC_SHA1_80: 16 byte key + 14 byte salt.
+const SRTPKeyLen = 30
 
 func (a Audio) Has(pt int) bool { return a.Offered[pt] }
 
@@ -58,6 +64,7 @@ func Parse(sdp []byte) (Audio, error) {
 				return a, fmt.Errorf("bad port")
 			}
 			a.Port, inAudio = port, true
+			a.Secure = strings.Contains(f[2], "SAVP")
 			for _, p := range f[3:] {
 				if pt, err := strconv.Atoi(p); err == nil {
 					a.Codecs = append(a.Codecs, pt)
@@ -65,6 +72,16 @@ func Parse(sdp []byte) (Audio, error) {
 				}
 			}
 		case 'a':
+			if inAudio && strings.HasPrefix(val, "crypto:") && a.Key == nil {
+				// a=crypto:1 AES_CM_128_HMAC_SHA1_80 inline:<base64 key||salt>[|lifetime|mki]
+				f := strings.Fields(val[7:])
+				if len(f) >= 3 && f[1] == "AES_CM_128_HMAC_SHA1_80" && strings.HasPrefix(f[2], "inline:") {
+					b64, _, _ := strings.Cut(f[2][7:], "|")
+					if raw, err := base64.StdEncoding.DecodeString(b64); err == nil && len(raw) == SRTPKeyLen {
+						a.Key = raw
+					}
+				}
+			}
 			if inAudio && strings.HasPrefix(val, "rtpmap:") && strings.Contains(val, "telephone-event") {
 				if pt, err := strconv.Atoi(strings.Fields(val[7:])[0]); err == nil {
 					a.DTMFPT = pt
@@ -100,4 +117,12 @@ func Build(ip string, port int, sessionID int64) []byte {
 		"a=sendrecv",
 		"",
 	}, "\r\n"))
+}
+
+// BuildSecure is Build for SRTP (SDES, RFC 4568): RTP/SAVP with the sender's own key material.
+func BuildSecure(ip string, port int, sessionID int64, key []byte) []byte {
+	plain := string(Build(ip, port, sessionID))
+	plain = strings.Replace(plain, "RTP/AVP", "RTP/SAVP", 1)
+	crypto := "a=crypto:1 AES_CM_128_HMAC_SHA1_80 inline:" + base64.StdEncoding.EncodeToString(key) + "\r\n"
+	return []byte(strings.Replace(plain, "a=ptime:20\r\n", crypto+"a=ptime:20\r\n", 1))
 }

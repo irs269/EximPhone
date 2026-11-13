@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net"
 	"strconv"
 	"sync"
 	"time"
@@ -24,6 +25,7 @@ var (
 // leg is one participant of a call: a browser (WebRTC) or a SIP phone (plain RTP).
 type leg interface {
 	key() string
+	owner() int64 // user id the audio belongs to (recording tracks)
 	send(p *rtp.Packet)
 	close()
 }
@@ -35,8 +37,9 @@ type peer struct {
 	out  *webrtc.TrackLocalStaticRTP
 }
 
-func (p *peer) key() string { return "u" + strconv.FormatInt(p.user, 10) }
-func (p *peer) close()      { _ = p.pc.Close() }
+func (p *peer) key() string  { return "u" + strconv.FormatInt(p.user, 10) }
+func (p *peer) owner() int64 { return p.user }
+func (p *peer) close()       { _ = p.pc.Close() }
 func (p *peer) send(pkt *rtp.Packet) {
 	if pkt.PayloadType == sdpmini.PTDTMF {
 		return // browsers do not negotiate telephone-event in this setup
@@ -49,6 +52,7 @@ func (p *peer) send(pkt *rtp.Packet) {
 type room struct {
 	mu   sync.Mutex
 	legs map[string]leg
+	rec  *recorder
 }
 
 func (r *room) others(from string) []leg {
@@ -63,8 +67,14 @@ func (r *room) others(from string) []leg {
 	return out
 }
 
-func (r *room) forward(from string, pkt *rtp.Packet) {
-	for _, l := range r.others(from) {
+func (r *room) forward(from leg, pkt *rtp.Packet) {
+	r.mu.Lock()
+	rec := r.rec
+	r.mu.Unlock()
+	if rec != nil {
+		rec.write(from.owner(), pkt)
+	}
+	for _, l := range r.others(from.key()) {
 		l.send(pkt)
 	}
 }
@@ -88,9 +98,12 @@ type manager struct {
 	publicIP         string
 	sipMin, sipMax   int
 
-	mu    sync.Mutex
-	rooms map[string]*room
-	legs  map[string]*sipLeg // by leg id, includes legs that are not active yet
+	mu     sync.Mutex
+	rooms  map[string]*room
+	legs   map[string]*sipLeg // by leg id, includes legs that are not active yet
+	recs   map[string]recordingConfig
+	recEnv *recorderEnv
+	mux    *net.UDPConn // the shared WebRTC port
 }
 
 func newAPI(se webrtc.SettingEngine, codec webrtc.RTPCodecParameters) (*webrtc.API, error) {
@@ -101,13 +114,18 @@ func newAPI(se webrtc.SettingEngine, codec webrtc.RTPCodecParameters) (*webrtc.A
 	return webrtc.NewAPI(webrtc.WithSettingEngine(se), webrtc.WithMediaEngine(me)), nil
 }
 
-// newManager splits [minPort, maxPort]: the lower half serves WebRTC legs, the upper half SIP legs.
+// newManager uses minPort as the single UDP port shared by every WebRTC leg (ICE UDP mux: one firewall
+// rule, no port per call) and the rest of [minPort+1, maxPort] for SIP phone legs (one port per leg).
 func newManager(publicIP string, minPort, maxPort uint16, log *slog.Logger) (*manager, error) {
-	mid := int(minPort) + (int(maxPort)-int(minPort))/2
-	se := webrtc.SettingEngine{}
-	if err := se.SetEphemeralUDPPortRange(minPort, uint16(mid)); err != nil {
+	if maxPort <= minPort {
+		return nil, errors.New("media port range too small")
+	}
+	conn, err := net.ListenUDP("udp4", &net.UDPAddr{Port: int(minPort)})
+	if err != nil {
 		return nil, err
 	}
+	se := webrtc.SettingEngine{}
+	se.SetICEUDPMux(webrtc.NewICEUDPMux(nil, conn))
 	se.SetNetworkTypes([]webrtc.NetworkType{webrtc.NetworkTypeUDP4})
 	if publicIP != "" {
 		// Docker/NAT: advertise the address clients can actually reach.
@@ -122,10 +140,27 @@ func newManager(publicIP string, minPort, maxPort uint16, log *slog.Logger) (*ma
 		return nil, err
 	}
 	return &manager{
-		opusAPI: opusAPI, g711API: g711API, log: log, publicIP: publicIP,
-		sipMin: mid + 1, sipMax: int(maxPort),
-		rooms: map[string]*room{}, legs: map[string]*sipLeg{},
+		opusAPI: opusAPI, g711API: g711API, log: log, publicIP: publicIP, mux: conn,
+		sipMin: int(minPort) + 1, sipMax: int(maxPort),
+		rooms: map[string]*room{}, legs: map[string]*sipLeg{}, recs: map[string]recordingConfig{},
 	}, nil
+}
+
+// close ends every call and releases the shared UDP port (used on shutdown and by tests).
+func (m *manager) close() {
+	m.mu.Lock()
+	ids := make([]string, 0, len(m.rooms))
+	for id := range m.rooms {
+		ids = append(ids, id)
+	}
+	for _, l := range m.legs {
+		ids = append(ids, l.callID)
+	}
+	m.mu.Unlock()
+	for _, id := range ids {
+		m.closeRoom(id)
+	}
+	_ = m.mux.Close()
 }
 
 func (m *manager) room(id string) *room {
@@ -134,6 +169,9 @@ func (m *manager) room(id string) *room {
 	r := m.rooms[id]
 	if r == nil {
 		r = &room{legs: map[string]leg{}}
+		if cfg, ok := m.recs[id]; ok && m.recEnv != nil {
+			r.rec = newRecorder(id, cfg, m.recEnv)
+		}
 		m.rooms[id] = r
 	}
 	return r
@@ -165,8 +203,10 @@ func (m *manager) leave(callID string, l leg) {
 		m.mu.Lock()
 		if m.rooms[callID] == r {
 			delete(m.rooms, callID)
+			delete(m.recs, callID)
 		}
 		m.mu.Unlock()
+		m.finishRecording(r)
 	}
 }
 
@@ -175,6 +215,7 @@ func (m *manager) closeRoom(callID string) {
 	m.mu.Lock()
 	r := m.rooms[callID]
 	delete(m.rooms, callID)
+	delete(m.recs, callID)
 	var pending []*sipLeg
 	for id, l := range m.legs {
 		if l.callID == callID {
@@ -196,6 +237,39 @@ func (m *manager) closeRoom(callID string) {
 	for _, l := range legs {
 		l.close()
 	}
+	m.finishRecording(r)
+}
+
+// setRecording marks a call for recording (the api decides from the department rules).
+func (m *manager) setRecording(callID string, cfg recordingConfig) {
+	if m.recEnv == nil {
+		return
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.recs[callID] = cfg
+	if r := m.rooms[callID]; r != nil {
+		r.mu.Lock()
+		if r.rec == nil {
+			r.rec = newRecorder(callID, cfg, m.recEnv)
+		}
+		r.mu.Unlock()
+	}
+}
+
+// finishRecording seals and uploads the recording of a finished call in the background.
+func (m *manager) finishRecording(r *room) {
+	r.mu.Lock()
+	rec := r.rec
+	r.mu.Unlock()
+	if rec == nil {
+		return
+	}
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+		defer cancel()
+		rec.finish(ctx)
+	}()
 }
 
 // join negotiates a browser leg for `user` and returns the SDP answer (non-trickle: candidates are included).
@@ -242,7 +316,7 @@ func (m *manager) join(ctx context.Context, callID string, user int64, offer str
 			if err != nil {
 				return
 			}
-			r.forward(p.key(), pkt)
+			r.forward(p, pkt)
 		}
 	})
 	pc.OnConnectionStateChange(func(s webrtc.PeerConnectionState) {
