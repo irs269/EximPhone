@@ -95,3 +95,7 @@ sh scripts/deploy-test.sh <vps-public-ip> <your-public-ip>/32
 The script generates fresh secrets (`.env`), a mock directory with a random password per account (`credentials.txt`), a self-signed certificate for the IP, starts the stack with `docker-compose.test.yml` and restricts the sites to your address (login is clock-in and is refused from other networks). Open the firewall as listed in the Firewall section (443/tcp and the UDP ranges are enough without desk phones). Delete `credentials.txt` and tear down with `docker compose -f docker-compose.yml -f docker-compose.test.yml down -v` when the trial ends.
 
 If port 443 is already used on the server (another web server), publish EximPhone elsewhere: add `HTTPS_PORT=8443` to `.env` and open that port; the application is then at `https://<ip>:8443`.
+
+## Heads of service (tickets)
+
+Tickets need a head per service: set `INITIAL_DEPT_HEADS="Department=user1,user2;Other=user3"` before the first start (the test script sets IT=asaid, HR=mjuma, Finance=hbakari, Operations=oabdallah, Communication=imoussa), then manage them with `PUT /api/admin/departments/{id}/heads`. Department names must match the directory (`departmentNumber`). See docs/tickets.md.

@@ -71,6 +71,7 @@ func (a *app) rbacRoutes(r chi.Router) {
 	})
 	a.announcementRoutes(r)
 	a.hrRoutes(r)
+	a.ticketRoutes(r)
 	r.With(a.requireAny("auditor")).Get("/audit", a.auditLog)
 }
 

@@ -49,6 +49,7 @@ LDAP_BIND_DN=$LDAP_BIND_DN
 LDAP_BIND_PASSWORD=$LDAP_BIND_PASSWORD
 # First administrators (usernames). Remove this line once roles are assigned in the application.
 INITIAL_IT_ADMINS=
+INITIAL_DEPT_HEADS=
 EOF
 chmod 600 .env
 echo ".env written. Next steps:" >&2

@@ -171,3 +171,33 @@ export const logout = async (reason: string) => {
   token = null;
   return r;
 };
+
+// ---- tickets ----
+export type TicketStatus = 'pending' | 'approved' | 'rejected' | 'assigned' | 'in_progress' | 'resolved' | 'cancelled';
+export type TicketPriority = 'low' | 'normal' | 'high' | 'urgent';
+export interface TicketCan { decide: boolean; assign: boolean; start: boolean; resolve: boolean; cancel: boolean }
+export interface TicketEvent { kind: string; actor: string; comment: string; created_at: string }
+export interface Ticket {
+  id: number; title: string; description: string; priority: TicketPriority; status: TicketStatus;
+  requester_id: number; requester: string; department_id: number; department: string;
+  assignee_id: number | null; assignee: string; decision_comment: string; decided_by: string; resolution: string;
+  created_at: string; updated_at: string; can: TicketCan; events?: TicketEvent[];
+}
+export interface TicketSummary { to_decide: number; to_assign: number; to_do: number; mine_open: number; waiting: number; is_head: boolean }
+export interface TicketService { id: number; name: string; heads: string[] }
+export type TicketView = '' | 'todo' | 'mine' | 'service';
+
+const post = <T>(path: string, body?: unknown) => request<T>(path, { method: 'POST', body: body === undefined ? undefined : JSON.stringify(body) });
+export const tickets = (view: TicketView) => request<{ tickets: Ticket[] }>('/tickets' + (view ? `?view=${view}` : ''));
+export const ticket = (id: number) => request<Ticket>(`/tickets/${id}`);
+export const ticketSummary = () => request<TicketSummary>('/tickets/summary');
+export const ticketServices = () => request<{ services: TicketService[] }>('/tickets/services');
+export const ticketCandidates = (id: number) =>
+  request<{ candidates: { id: number; display_name: string; extension: string }[] }>(`/tickets/${id}/candidates`);
+export const createTicket = (b: { title: string; description: string; priority: TicketPriority; department_id: number }) => post<Ticket>('/tickets', b);
+export const decideTicket = (id: number, approve: boolean, comment: string) => post<Ticket>(`/tickets/${id}/decision`, { approve, comment });
+export const assignTicket = (id: number, user_id: number, comment: string) => post<Ticket>(`/tickets/${id}/assign`, { user_id, comment });
+export const startTicket = (id: number) => post<Ticket>(`/tickets/${id}/start`);
+export const resolveTicket = (id: number, comment: string) => post<Ticket>(`/tickets/${id}/resolve`, { comment });
+export const cancelTicket = (id: number) => post<Ticket>(`/tickets/${id}/cancel`);
+export const commentTicket = (id: number, comment: string) => post<{ ok: boolean }>(`/tickets/${id}/comments`, { comment });

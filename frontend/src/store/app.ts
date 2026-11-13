@@ -5,9 +5,10 @@ import { t } from '../i18n';
 import { useChat } from './chat';
 import { useCalls } from './calls';
 import { useAnn } from './ann';
+import { useTickets } from './tickets';
 import type { Presence } from '../data/mock';
 
-export type View = 'chat' | 'phone' | 'dir' | 'att' | 'ann' | 'team' | 'audit' | 'help';
+export type View = 'chat' | 'phone' | 'dir' | 'att' | 'ann' | 'tickets' | 'team' | 'audit' | 'help';
 export type Dialog =
   | { kind: 'arrival'; resumed: boolean }
   | { kind: 'logout'; summary: LogoutSummary }
@@ -65,6 +66,7 @@ export const useApp = create<State>((set, get) => ({
         set({ phase: 'in', user: r.user, roles: r.roles, today: r.attendance, presence: 'on' });
         useChat.getState().start(r.user.id);
         void useAnn.getState().load();
+        void useTickets.getState().loadSummary();
         return;
       }
     } catch { /* fall through to login */ }
@@ -80,6 +82,7 @@ export const useApp = create<State>((set, get) => ({
       useChat.getState().start(r.user.id);
       void api.me().then((m) => set({ roles: m.roles })).catch(() => undefined);
       void useAnn.getState().load();
+        void useTickets.getState().loadSummary();
     } catch (e) {
       set({ loginError: loginMessage(e) });
     }
@@ -99,6 +102,7 @@ export const useApp = create<State>((set, get) => ({
       const r = await api.logout(reason);
       useChat.getState().stop();
       useAnn.getState().reset();
+      useTickets.getState().reset();
       useCalls.getState().reset();
       set({ phase: 'out', user: null, roles: ['employee'], today: null,
         dialog: { kind: 'bye', time: r.clock_out, durationMin: r.duration_min, name } });
