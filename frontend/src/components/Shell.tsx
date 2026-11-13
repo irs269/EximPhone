@@ -16,6 +16,8 @@ import { hm, durMin, initials } from '../lib';
 import { Chat as ChatView } from '../views/Chat';
 import { Phone } from '../views/Phone';
 import { Directory } from '../views/Directory';
+import { Help, faqIds } from '../views/Help';
+import { LangSwitch } from './LangSwitch';
 import { Announcements } from '../views/Announcements';
 import { Attendance, dayStatus } from '../views/Attendance';
 import { CallOverlay } from './CallOverlay';
@@ -29,6 +31,7 @@ const nav: { v: View; icon: IconName; label: Parameters<typeof t>[0] }[] = [
   { v: 'ann', icon: 'ann', label: 'nav.announcements' },
   { v: 'team', icon: 'chart', label: 'nav.team' },
   { v: 'audit', icon: 'shield', label: 'nav.audit' },
+  { v: 'help', icon: 'help', label: 'nav.help' },
 ];
 const visible = (v: View, roles: string[]) =>
   v === 'team' ? roles.includes('hr') || roles.includes('manager') : v === 'audit' ? roles.includes('auditor') : true;
@@ -39,12 +42,12 @@ function Rail() {
   const pendingAnn = useAnn((a) => a.items.filter((x) => !x.acked_at).length);
   const badge = (v: View) => (v === 'chat' ? unread : v === 'ann' ? pendingAnn : 0);
   return (
-    <nav className="rail" aria-label="Navigation principale">
+    <nav className="rail" aria-label={t('nav.main')}>
       <div className="mono" title="Exim Bank" role="img" aria-label="Exim Bank" />
       {nav.filter((n) => visible(n.v, roles)).map(({ v, icon, label }) => (
         <button key={v} className={view === v ? 'on' : ''} aria-current={view === v ? 'page' : undefined} onClick={() => setView(v)}>
           <Icon name={icon} />{t(label)}
-          {badge(v) > 0 && <span className="badge" aria-label={`${badge(v)} non lus`}>{badge(v)}</span>}
+          {badge(v) > 0 && <span className="badge" aria-label={t('nav.unread', { n: badge(v) })}>{badge(v)}</span>}
         </button>
       ))}
       <button className="lo" style={{ marginTop: 'auto' }} onClick={askLogout}><Icon name="logout" />{t('nav.logout')}</button>
@@ -68,7 +71,8 @@ function StatusMenu() {
   const items: Presence[] = ['on', 'busy', 'meet', 'away', 'dnd'];
   return (
     <div id="stm" onClick={(e) => e.stopPropagation()}>
-      <div className="hd"><b>{user?.display_name}</b><span>Poste {user?.extension} · {t(`status.${presence}`)}</span></div>
+      <div className="hd"><b>{user?.display_name}</b><span>{t('call.ext', { ext: user?.extension ?? '' })} · {t(`status.${presence}`)}</span></div>
+      <LangSwitch />
       {items.map((k) => (
         <button key={k} className={k === presence ? 'sel' : ''} onClick={() => setPresence(k)}>
           <i style={{ background: presenceColor[k] }} /><span><b>{t(`status.${k}`)}</b><small>{t(`status.${k}.d`)}</small></span>
@@ -82,7 +86,7 @@ function StatusMenu() {
 function ListPane() {
   const s = useApp();
   const q = s.query.toLowerCase();
-  const titles: Record<View, Parameters<typeof t>[0]> = { chat: 'nav.messages', phone: 'nav.calls', dir: 'nav.directory', att: 'nav.attendance', ann: 'nav.announcements', team: 'nav.team', audit: 'nav.audit' };
+  const titles: Record<View, Parameters<typeof t>[0]> = { chat: 'nav.messages', phone: 'nav.calls', dir: 'nav.directory', att: 'nav.attendance', ann: 'nav.announcements', team: 'nav.team', audit: 'nav.audit', help: 'nav.help' };
   const annItems = useAnn((a) => a.items);
   const chat = useChat();
   const calls = useCalls();
@@ -124,7 +128,7 @@ function ListPane() {
         <button key={c.id} className="it" onClick={() => void calls.dial(c.other.id)}>
           <UserAvatar u={u} status={chat.presence[c.other.id]} />
           <div className="t"><div className="n"><span className={kind}>{c.other.display_name}</span><small>{hm(c.created_at)}</small></div>
-            <div className="s">{kind === 'miss' ? '↙ Manqué' : kind === 'in' ? '↙ Entrant' : '↗ Sortant'} · Poste {c.other.extension}{c.duration_sec ? ` · ${Math.floor(c.duration_sec / 60)} min ${c.duration_sec % 60} s` : ''}</div></div>
+            <div className="s">{kind === 'miss' ? t('call.missed') : kind === 'in' ? t('call.in') : t('call.out')} · {t('call.ext', { ext: c.other.extension ?? '' })}{c.duration_sec ? ` · ${t('call.duration', { m: Math.floor(c.duration_sec / 60), s: c.duration_sec % 60 })}` : ''}</div></div>
         </button>
       );
     })];
@@ -148,6 +152,12 @@ function ListPane() {
     ));
   } else if (s.view === 'team' || s.view === 'audit') {
     items = [];
+  } else if (s.view === 'help') {
+    items = faqIds.filter((n) => t(`faq.q${n}` as 'faq.q1').toLowerCase().includes(q)).map((n) => (
+      <button key={n} className="it" onClick={() => { const d = document.getElementById('faq' + n) as HTMLDetailsElement | null; if (d) { d.open = true; d.scrollIntoView({ behavior: 'smooth' }); } }}>
+        <div className="t"><div className="n">{t(`faq.q${n}` as 'faq.q1')}</div></div>
+      </button>
+    ));
   } else {
     items = [<div className="sec" key="h">{t('list.month')}</div>, ...(days.data?.days ?? []).map((d) => {
       const st = dayStatus(d);
@@ -194,6 +204,7 @@ export function Shell() {
           {view === 'ann' && <Announcements />}
           {view === 'team' && <Team />}
           {view === 'audit' && <Audit />}
+          {view === 'help' && <Help />}
         </main>
       </div>
       <StatusMenu />

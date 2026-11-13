@@ -20,22 +20,22 @@ export function Directory() {
 
   return (
     <>
-      <div className="top"><div className="tt"><b>Annuaire Exim Bank</b><span>{list.length} collaborateurs · synchronisé avec Active Directory</span></div></div>
+      <div className="top"><div className="tt"><b>{t('dir.title')}</b><span>{t('dir.sub', { n: list.length })}</span></div></div>
       <div className="prof">
         <div className="pc">
           <div className="cv" />
           <UserAvatar u={u} status={st} big />
           <div className="info"><b>{u.display_name}</b><span>{u.department}</span></div>
           <div className="acts">
-            {u.extension && <button className="btn" onClick={() => void dial(u.id)}><Icon name="call" /> Appeler</button>}
-            <button className="btn gold" onClick={async () => { await startDirect(u.id); setView('chat'); }}><Icon name="chat" /> Message</button>
+            {u.extension && <button className="btn" onClick={() => void dial(u.id)}><Icon name="call" /> {t('call.call')}</button>}
+            <button className="btn gold" onClick={async () => { await startDirect(u.id); setView('chat'); }}><Icon name="chat" /> {t('dir.message')}</button>
           </div>
           <div className="rows">
-            <div><span>Poste interne</span><b>{u.extension}</b></div>
-            <div><span>Département</span>{u.department}</div>
-            <div><span>Site</span>{u.site}</div>
-            <div><span>Statut</span>{st && label[st] ? t(label[st] as 'status.on') : t('chat.offline')}</div>
-            <div><span>E-mail</span>{u.email}</div>
+            <div><span>{t('dir.ext')}</span><b>{u.extension}</b></div>
+            <div><span>{t('dir.dept')}</span>{u.department}</div>
+            <div><span>{t('dir.site')}</span>{u.site}</div>
+            <div><span>{t('dir.status')}</span>{st && label[st] ? t(label[st] as 'status.on') : t('chat.offline')}</div>
+            <div><span>{t('dir.email')}</span>{u.email}</div>
           </div>
         </div>
       </div>

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { history, type Day } from '../api/client';
 import { useApp } from '../store/app';
-import { t } from '../i18n';
+import { t, dateLocale } from '../i18n';
 import { durMin, hm } from '../lib';
 
 export function dayStatus(d: Day): { cls: 'ok' | 'late' | 'ko'; label: string } {
@@ -13,7 +13,7 @@ export function dayStatus(d: Day): { cls: 'ok' | 'late' | 'ko'; label: string } 
 }
 
 const dateLabel = (iso: string) =>
-  new Date(iso + 'T00:00:00').toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' });
+  new Date(iso + 'T00:00:00').toLocaleDateString(dateLocale(), { weekday: 'short', day: 'numeric', month: 'short' });
 
 export function Attendance() {
   const { today, askLogout } = useApp();

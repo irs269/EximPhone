@@ -2,9 +2,9 @@ import { useEffect, useState } from 'react';
 import { announcementAcks, orgMeta, publishAnnouncement, type AckPerson, type AnnouncementItem, type OrgMeta } from '../api/client';
 import { useApp } from '../store/app';
 import { useAnn } from '../store/ann';
-import { t } from '../i18n';
+import { t, dateLocale } from '../i18n';
 
-const when = (iso: string) => new Date(iso).toLocaleString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+const when = (iso: string) => new Date(iso).toLocaleString(dateLocale(), { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 
 function Followup({ a, onClose }: { a: AnnouncementItem; onClose: () => void }) {
   const [data, setData] = useState<{ total: number; read: AckPerson[]; unread: AckPerson[] } | null>(null);

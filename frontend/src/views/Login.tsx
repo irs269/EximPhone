@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { useApp } from '../store/app';
 import { t } from '../i18n';
+import { LangSwitch } from '../components/LangSwitch';
 
 export function Login() {
   const { login, loginError } = useApp();
@@ -17,6 +18,7 @@ export function Login() {
 
   return (
     <div id="login">
+      <LangSwitch className="corner" />
       <div className="brand">
         <img src="/brand/logo-white.svg" alt="Exim Bank" />
         <div>

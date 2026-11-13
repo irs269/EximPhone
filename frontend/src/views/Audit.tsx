@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { auditLog } from '../api/client';
-import { t } from '../i18n';
+import { t, dateLocale } from '../i18n';
 
 const PAGE = 50;
 
@@ -31,7 +31,7 @@ export function Audit() {
             <tbody>
               {entries.map((e) => (
                 <tr key={e.id}>
-                  <td style={{ whiteSpace: 'nowrap' }}>{new Date(e.at).toLocaleString('fr-FR')}</td><td>{e.actor || '—'}</td><td><b>{e.action}</b></td><td>{e.ip}</td>
+                  <td style={{ whiteSpace: 'nowrap' }}>{new Date(e.at).toLocaleString(dateLocale())}</td><td>{e.actor || '—'}</td><td><b>{e.action}</b></td><td>{e.ip}</td>
                   <td style={{ fontSize: 12, color: 'var(--muted)', maxWidth: 360, wordBreak: 'break-word' }}>{JSON.stringify(e.details).slice(0, 160)}</td>
                 </tr>
               ))}
