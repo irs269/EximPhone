@@ -82,3 +82,14 @@ Media is the dominant consumer (WebRTC legs plus relay). Size the VPS for it: ab
 
 `sh scripts/scan.sh` scans our images and the base images. Findings in the upstream `postgres:16-alpine` image
 (Go standard library inside its `gosu` helper) are not fixable by us: track upstream tags and rebuild when a patched image is published.
+
+## Test deployment on a VPS (self-signed, mock directory)
+
+For a trial on a public VPS (not production): on the server (Docker + Compose v2, git, openssl)
+
+```sh
+git clone https://github.com/irs269/EximPhone.git && cd EximPhone
+sh scripts/deploy-test.sh <vps-public-ip> <your-public-ip>/32
+```
+
+The script generates fresh secrets (`.env`), a mock directory with a random password per account (`credentials.txt`), a self-signed certificate for the IP, starts the stack with `docker-compose.test.yml` and restricts the sites to your address (login is clock-in and is refused from other networks). Open the firewall as listed in the Firewall section (443/tcp and the UDP ranges are enough without desk phones). Delete `credentials.txt` and tear down with `docker compose -f docker-compose.yml -f docker-compose.test.yml down -v` when the trial ends.

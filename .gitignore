@@ -4,3 +4,5 @@ backups/
 node_modules/
 *.log
 .load-users.ldif
+credentials.txt
+ldap-mock/employees.generated.ldif
