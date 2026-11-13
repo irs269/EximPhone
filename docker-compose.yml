@@ -18,7 +18,7 @@ services:
       NGINX_LOGIN_BURST: ${NGINX_LOGIN_BURST:-10}
       NGINX_API_BURST: ${NGINX_API_BURST:-200}
     restart: unless-stopped
-    ports: ["443:443"]
+    ports: ["${HTTPS_PORT:-443}:443"]
     volumes:
       - ./nginx/templates:/etc/nginx/templates:ro
       - ./nginx/certs:/etc/nginx/certs:ro
