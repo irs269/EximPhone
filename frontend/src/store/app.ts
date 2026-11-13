@@ -7,7 +7,7 @@ import { useCalls } from './calls';
 import { useAnn } from './ann';
 import type { Presence } from '../data/mock';
 
-export type View = 'chat' | 'phone' | 'dir' | 'att' | 'ann' | 'team' | 'audit';
+export type View = 'chat' | 'phone' | 'dir' | 'att' | 'ann' | 'team' | 'audit' | 'help';
 export type Dialog =
   | { kind: 'arrival'; resumed: boolean }
   | { kind: 'logout'; summary: LogoutSummary }

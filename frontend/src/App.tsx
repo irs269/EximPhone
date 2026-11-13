@@ -1,13 +1,15 @@
-import { useEffect } from 'react';
+import { Fragment, useEffect } from 'react';
 import { refresh } from './api/client';
 import { useApp } from './store/app';
 import { Login } from './views/Login';
 import { Shell } from './components/Shell';
 import { Dialogs } from './components/Dialogs';
+import { useLocale } from './i18n';
 
 export function App() {
   const phase = useApp((s) => s.phase);
   const bootstrap = useApp((s) => s.bootstrap);
+  const locale = useLocale((s) => s.locale);
 
   useEffect(() => { void bootstrap(); }, [bootstrap]);
 
@@ -19,6 +21,10 @@ export function App() {
   }, [phase]);
 
   if (phase === 'loading') return null;
-  if (phase === 'out') return <><Login /><Dialogs /></>;
-  return <Shell />;
+  // The key remounts the tree so every t() call is re-evaluated when the language changes.
+  return (
+    <Fragment key={locale}>
+      {phase === 'out' ? <><Login /><Dialogs /></> : <Shell />}
+    </Fragment>
+  );
 }

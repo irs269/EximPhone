@@ -65,7 +65,7 @@ export function Chat() {
   const other = conv.kind === 'direct' ? users[conv.members.find((id) => id !== me) ?? 0] : undefined;
   const title = convTitle(conv, users, me);
   const sub = other
-    ? `${other.department} · Poste ${other.extension}`
+    ? `${other.department} · ${t('call.ext', { ext: other.extension ?? '' })}`
     : t('chat.members', { n: conv.members.length });
   const typer = typing[active] ? users[typing[active]]?.display_name.split(' ')[0] : '';
 
@@ -96,7 +96,7 @@ export function Chat() {
       <div className="top">
         {other ? <UserAvatar u={other} status={useChat.getState().presence[other.id]} /> : <GroupAvatar />}
         <div className="tt"><b>{title}</b><span>{sub}</span></div>
-        {other && other.extension && <button className="ib" aria-label="Appeler" onClick={() => void useCalls.getState().dial(other.id)}><Icon name="call" /></button>}
+        {other && other.extension && <button className="ib" aria-label={t('call.call')} onClick={() => void useCalls.getState().dial(other.id)}><Icon name="call" /></button>}
       </div>
       <div className="msgs" role="log" aria-live="polite">
         {hasMore[active] && <button className="btn ghost" style={{ alignSelf: 'center' }} onClick={() => loadOlder(active)}>{t('chat.older')}</button>}

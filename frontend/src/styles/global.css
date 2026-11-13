@@ -201,3 +201,22 @@ button.it{width:100%;text-align:left;font:inherit;color:inherit}
 .dbox .form{padding:20px 26px;text-align:left}
 .xfer{background:var(--surface);color:var(--text);border-radius:12px;padding:12px;margin:0 0 16px;text-align:left}
 .xfer .picker{max-height:180px;margin:8px 0}
+
+/* language switch + help desk */
+.langsw{display:inline-flex;border:1px solid var(--line);border-radius:999px;overflow:hidden;background:var(--surface)}
+.langsw button{border:0;background:transparent;padding:4px 12px;font:inherit;font-size:12px;font-weight:600;color:var(--muted);cursor:pointer}
+.langsw button.on{background:var(--navy);color:var(--surface)}
+.langsw button:focus-visible{outline:2px solid var(--gold);outline-offset:-2px}
+#login .langsw.corner{position:absolute;top:20px;right:24px}
+#stm .langsw{margin:8px 16px 0}
+.help{max-width:760px;width:100%;display:grid;gap:24px}
+.faq details{border-top:1px solid var(--line);padding:12px 0}
+.faq details:first-of-type{border-top:0}
+.faq summary{cursor:pointer;font-weight:600;color:var(--navy);list-style-position:outside}
+.faq p{margin:8px 0 0;line-height:1.55;color:var(--text)}
+.agents .it{cursor:default}
+.agents .acts{display:flex;gap:8px}
+.kv{display:grid;grid-template-columns:140px 1fr;gap:6px 12px;font-size:13px}
+.kv span{color:var(--muted)}
+.agents .btn{display:inline-flex;flex-direction:row;align-items:center;gap:6px;padding:8px 14px;font-size:13px;white-space:nowrap;width:auto;height:auto}
+.agents .btn svg{width:16px;height:16px}
