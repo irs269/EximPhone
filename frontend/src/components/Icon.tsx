@@ -18,6 +18,7 @@ const defs: Record<string, [Style, ReactNode]> = {
   pause: ['fill', <><rect x="6" y="4" width="4" height="16" /><rect x="14" y="4" width="4" height="16" /></>],
   transfer: ['stroke', <path d="M17 3l4 4-4 4M21 7H9M7 21l-4-4 4-4M3 17h12" />],
   grid: ['fill', <>{[5, 12, 19].flatMap((y) => [5, 12, 19].map((x) => <circle key={`${x}${y}`} cx={x} cy={y} r="2" />))}</>],
+  ticket: ['stroke', <path d="M3 8a2 2 0 0 0 2-2h14a2 2 0 0 0 2 2v2a2 2 0 0 0 0 4v2a2 2 0 0 0-2 2H5a2 2 0 0 0-2-2v-2a2 2 0 0 0 0-4zM9 6v12" />],
   help: ['stroke', <><circle cx="12" cy="12" r="9" /><path d="M9.5 9.5a2.5 2.5 0 1 1 3.6 2.2c-.7.4-1.1 1-1.1 1.8M12 17h.01" /></>],
   lock: ['fill', <path d="M6 10V8a6 6 0 1 1 12 0v2h1a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V11a1 1 0 0 1 1-1zm2 0h8V8a4 4 0 1 0-8 0z" />],
 };

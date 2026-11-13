@@ -56,6 +56,7 @@ LDAP_BASE_DN=ou=people,dc=exim,dc=local
 LDAP_USER_ATTR=uid
 LDAP_BIND_DN=cn=admin,dc=exim,dc=local
 INITIAL_IT_ADMINS=asaid
+INITIAL_DEPT_HEADS="IT=asaid;HR=mjuma;Finance=hbakari;Operations=oabdallah;Communication=imoussa"
 ENV
 chmod 600 .env
 

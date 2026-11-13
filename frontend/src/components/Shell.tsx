@@ -17,6 +17,10 @@ import { Chat as ChatView } from '../views/Chat';
 import { Phone } from '../views/Phone';
 import { Directory } from '../views/Directory';
 import { Help, faqIds } from '../views/Help';
+import { Tickets, StatusPill } from '../views/Tickets';
+import { NewTicketDialog } from './NewTicketDialog';
+import { useTickets } from '../store/tickets';
+import type { TicketView } from '../api/client';
 import { LangSwitch } from './LangSwitch';
 import { Announcements } from '../views/Announcements';
 import { Attendance, dayStatus } from '../views/Attendance';
@@ -29,6 +33,7 @@ const nav: { v: View; icon: IconName; label: Parameters<typeof t>[0] }[] = [
   { v: 'dir', icon: 'dir', label: 'nav.directory' },
   { v: 'att', icon: 'clock', label: 'nav.attendance' },
   { v: 'ann', icon: 'ann', label: 'nav.announcements' },
+  { v: 'tickets', icon: 'ticket', label: 'nav.tickets' },
   { v: 'team', icon: 'chart', label: 'nav.team' },
   { v: 'audit', icon: 'shield', label: 'nav.audit' },
   { v: 'help', icon: 'help', label: 'nav.help' },
@@ -40,7 +45,8 @@ function Rail() {
   const { view, setView, askLogout, user, presence, toggleStatusMenu, roles } = useApp();
   const unread = useChat((c) => c.convs.reduce((n, x) => n + x.unread, 0));
   const pendingAnn = useAnn((a) => a.items.filter((x) => !x.acked_at).length);
-  const badge = (v: View) => (v === 'chat' ? unread : v === 'ann' ? pendingAnn : 0);
+  const waitingTickets = useTickets((tk) => tk.summary.waiting);
+  const badge = (v: View) => (v === 'chat' ? unread : v === 'ann' ? pendingAnn : v === 'tickets' ? waitingTickets : 0);
   return (
     <nav className="rail" aria-label={t('nav.main')}>
       <div className="mono" title="Exim Bank" role="img" aria-label="Exim Bank" />
@@ -86,7 +92,7 @@ function StatusMenu() {
 function ListPane() {
   const s = useApp();
   const q = s.query.toLowerCase();
-  const titles: Record<View, Parameters<typeof t>[0]> = { chat: 'nav.messages', phone: 'nav.calls', dir: 'nav.directory', att: 'nav.attendance', ann: 'nav.announcements', team: 'nav.team', audit: 'nav.audit', help: 'nav.help' };
+  const titles: Record<View, Parameters<typeof t>[0]> = { chat: 'nav.messages', phone: 'nav.calls', dir: 'nav.directory', att: 'nav.attendance', ann: 'nav.announcements', tickets: 'nav.tickets', team: 'nav.team', audit: 'nav.audit', help: 'nav.help' };
   const annItems = useAnn((a) => a.items);
   const chat = useChat();
   const calls = useCalls();
@@ -96,6 +102,8 @@ function ListPane() {
     const id = window.setTimeout(() => { void searchMessages(q).then((r) => setHits(r.results)).catch(() => setHits([])); }, 300);
     return () => window.clearTimeout(id);
   }, [q, s.view]);
+  const tk = useTickets();
+  useEffect(() => { if (s.view === 'tickets') { void tk.loadList(); void tk.loadSummary(); } }, [s.view]); // eslint-disable-line react-hooks/exhaustive-deps
   const days = useQuery({ queryKey: ['history'], queryFn: history, enabled: s.view === 'att' });
   let items: React.ReactNode[] = [];
 
@@ -152,6 +160,22 @@ function ListPane() {
     ));
   } else if (s.view === 'team' || s.view === 'audit') {
     items = [];
+  } else if (s.view === 'tickets') {
+    const filters: [TicketView, Parameters<typeof t>[0]][] = [['', 'tk.filter.all'], ['mine', 'tk.filter.mine'], ['todo', 'tk.filter.todo'], ...(tk.summary.is_head ? [['service', 'tk.filter.service'] as [TicketView, Parameters<typeof t>[0]]] : [])];
+    items = [
+      <button key="new" className="btn gold newbtn" onClick={() => tk.setComposing(true)}>+ {t('tk.new')}</button>,
+      <div className="tkf" key="f" role="group">
+        {filters.map(([v, label]) => <button key={v || 'all'} className={tk.view === v ? 'on' : ''} aria-pressed={tk.view === v} onClick={() => tk.setView(v)}>{t(label)}</button>)}
+      </div>,
+      ...tk.list.filter((x) => (x.title + x.department + x.requester).toLowerCase().includes(q)).map((x) => (
+        <button key={x.id} className={'it' + (tk.selected?.id === x.id ? ' on' : '')} onClick={() => void tk.select(x.id)}>
+          <div className="t"><div className="n">#{x.id} · {x.title}<small>{hm(x.updated_at)}</small></div>
+            <div className="s">{x.department} · {x.requester}</div><div style={{ marginTop: 4 }}><StatusPill s={x.status} /></div></div>
+          {(x.can.decide || (x.can.assign && x.status === 'approved') || x.can.start) && <span className="cnt">!</span>}
+        </button>
+      )),
+    ];
+    if (!tk.list.length) items = [items[0], items[1], <div className="sec" key="none" style={{ color: 'var(--muted)' }}>{t('tk.none')}</div>];
   } else if (s.view === 'help') {
     items = faqIds.filter((n) => t(`faq.q${n}` as 'faq.q1').toLowerCase().includes(q)).map((n) => (
       <button key={n} className="it" onClick={() => { const d = document.getElementById('faq' + n) as HTMLDetailsElement | null; if (d) { d.open = true; d.scrollIntoView({ behavior: 'smooth' }); } }}>
@@ -205,11 +229,13 @@ export function Shell() {
           {view === 'team' && <Team />}
           {view === 'audit' && <Audit />}
           {view === 'help' && <Help />}
+          {view === 'tickets' && <Tickets />}
         </main>
       </div>
       <StatusMenu />
       <CallOverlay />
       <NewChatDialog />
+      <NewTicketDialog />
       <UrgentDialog />
       <Dialogs />
       <div id="toast" className={toast ? 'show' : ''} role="status" aria-live="polite">{toast}</div>

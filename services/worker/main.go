@@ -69,6 +69,21 @@ func syncDirectory(ctx context.Context, db *pgxpool.Pool, dir directory.Client, 
 			return err
 		}
 	}
+	// Bootstrap: heads of service for the ticket workflow, "Department=user1,user2;Other=user3" (idempotent).
+	for _, part := range strings.Split(os.Getenv("INITIAL_DEPT_HEADS"), ";") {
+		dept, users, ok := strings.Cut(strings.TrimSpace(part), "=")
+		if !ok || strings.TrimSpace(dept) == "" {
+			continue
+		}
+		names := strings.Split(users, ",")
+		for i := range names {
+			names[i] = strings.TrimSpace(names[i])
+		}
+		if _, err := db.Exec(ctx, `INSERT INTO department_heads(department_id, user_id)
+			SELECT d.id, u.id FROM departments d, users u WHERE d.name = $1 AND u.username::text = ANY($2) AND u.active ON CONFLICT DO NOTHING`, strings.TrimSpace(dept), names); err != nil {
+			return err
+		}
+	}
 	log.Info("directory synced", "users", len(people), "deactivated", tag.RowsAffected())
 	return nil
 }
