@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"log"
 	"log/slog"
+	"net/url"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -14,6 +16,8 @@ import (
 	"github.com/irs269/eximphone/services/pkg/server"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/minio/minio-go/v7"
+	"github.com/minio/minio-go/v7/pkg/credentials"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -114,6 +118,59 @@ func closeStale(ctx context.Context, db *pgxpool.Pool, rdb *redis.Client, log *s
 	return len(list), nil
 }
 
+// purgeRecordings deletes recordings older than the retention period (objects first, then rows) and audits it.
+func purgeRecordings(ctx context.Context, db *pgxpool.Pool, s3 *minio.Client, days int, log *slog.Logger) {
+	rows, err := db.Query(ctx, `SELECT id::text, s3_key FROM call_recordings WHERE created_at < now() - make_interval(days => $1)`, days)
+	if err != nil {
+		log.Error("recording purge query failed", "err", err)
+		return
+	}
+	type item struct{ id, key string }
+	var old []item
+	for rows.Next() {
+		var it item
+		if rows.Scan(&it.id, &it.key) == nil {
+			old = append(old, it)
+		}
+	}
+	rows.Close()
+	purged := 0
+	for _, it := range old {
+		if err := s3.RemoveObject(ctx, "recordings", it.key, minio.RemoveObjectOptions{}); err != nil {
+			log.Warn("recording object removal failed", "key", it.key, "err", err)
+			continue
+		}
+		if _, err := db.Exec(ctx, `DELETE FROM call_recordings WHERE id=$1::uuid`, it.id); err == nil {
+			purged++
+		}
+	}
+	if purged > 0 {
+		_, _ = db.Exec(ctx, `INSERT INTO audit_log(actor_name, action, details) VALUES ('system', 'recordings_purged', jsonb_build_object('count', $1::int, 'older_than_days', $2::int))`, purged, days)
+		log.Info("recordings purged", "count", purged, "older_than_days", days)
+	}
+}
+
+func s3FromEnv() *minio.Client {
+	endpoint := os.Getenv("S3_ENDPOINT")
+	if endpoint == "" {
+		return nil
+	}
+	u, err := url.Parse(endpoint)
+	if err != nil {
+		return nil
+	}
+	c, err := minio.New(u.Host, &minio.Options{
+		Creds:        credentials.NewStaticV4(os.Getenv("S3_ACCESS_KEY_ID"), os.Getenv("S3_SECRET_ACCESS_KEY"), ""),
+		Secure:       u.Scheme == "https",
+		Region:       "garage",
+		BucketLookup: minio.BucketLookupPath,
+	})
+	if err != nil {
+		return nil
+	}
+	return c
+}
+
 func main() {
 	dsn := os.Getenv("DATABASE_URL")
 	if dsn == "" {
@@ -138,6 +195,12 @@ func main() {
 		t := time.NewTicker(time.Minute)
 		defer t.Stop()
 		lastSync := time.Time{}
+		lastPurge := time.Time{}
+		s3 := s3FromEnv()
+		retention, _ := strconv.Atoi(os.Getenv("RECORDING_RETENTION_DAYS"))
+		if retention <= 0 {
+			retention = 365
+		}
 		for {
 			// Directory sync at startup, then every night at 02:00 UTC.
 			now := time.Now().UTC()
@@ -147,6 +210,10 @@ func main() {
 				} else {
 					lastSync = now
 				}
+			}
+			if s3 != nil && time.Since(lastPurge) > 24*time.Hour {
+				purgeRecordings(ctx, db, s3, retention, l)
+				lastPurge = time.Now()
 			}
 			if _, err := closeStale(ctx, db, rdb, l); err != nil && ctx.Err() == nil {
 				l.Error("close stale days failed", "err", err)

@@ -17,6 +17,8 @@ type phone struct {
 	Password    string
 	Server      string
 	Port        int
+	TLS         bool // SIP over TLS (port 5061) is mandatory
+	SRTP        bool // SRTP is mandatory
 }
 
 // clean strips anything that could break out of a line-oriented config value (CR/LF injection).
@@ -49,7 +51,8 @@ account.1.user_name = {{clean .Extension}}
 account.1.password = {{clean .Password}}
 account.1.sip_server.1.address = {{clean .Server}}
 account.1.sip_server.1.port = {{.Port}}
-account.1.sip_server.1.transport_type = 0
+account.1.sip_server.1.transport_type = {{if .TLS}}2{{else}}0{{end}}
+account.1.srtp_encryption = {{if .SRTP}}2{{else}}0{{end}}
 account.1.sip_server.1.expires = 3600
 account.1.nat.udp_update_enable = 1
 account.1.codec.pcmu.enable = 1
@@ -74,6 +77,8 @@ static.auto_provision.repeat.minutes = 1440
     <P58>8</P58>
     <P79>101</P79>
     <P52>1</P52>
+    <P130>{{if .TLS}}2{{else}}0{{end}}</P130>
+    <P183>{{if .SRTP}}2{{else}}0{{end}}</P183>
   </config>
 </gs_provision>
 `,

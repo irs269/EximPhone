@@ -2,7 +2,9 @@ package main
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net"
 	"strconv"
@@ -30,9 +32,10 @@ const (
 )
 
 type event struct {
-	kind   evKind
-	leg    *bLeg
-	remote string // phone RTP address from its SDP
+	kind      evKind
+	leg       *bLeg
+	remote    string // phone RTP address from its SDP
+	remoteKey []byte // phone SRTP key from its SDP (nil for plain RTP)
 }
 
 // bLeg is one forked INVITE toward a registered desk phone of the callee.
@@ -53,6 +56,7 @@ type session struct {
 	aDlg  *sipgo.DialogServerSession
 	aLeg  *mediaLeg
 	aUser int64
+	aSDP  []byte // SDP for the 200 OK to the calling phone
 
 	forkOnce sync.Once
 	done     chan struct{}
@@ -112,6 +116,12 @@ func (s *service) onInvite(req *sip.Request, tx sip.ServerTransaction) {
 		_ = dlg.Respond(sip.StatusNotAcceptableHere, "Not Acceptable Here", nil) // phones must speak G.711 mu-law
 		return
 	}
+	secure := offer.Secure && offer.Key != nil
+	s.log.Info("invite received", "ext", dev.Extension, "srtp_offered", offer.Secure, "key", offer.Key != nil, "srtp_required", s.cfg.requireSRTP)
+	if s.cfg.requireSRTP && !secure {
+		_ = dlg.Respond(sip.StatusNotAcceptableHere, "SRTP required", nil)
+		return
+	}
 	res, code, err := s.api.createCall(ctx, dev.UserID, req.Recipient.User)
 	switch {
 	case err != nil:
@@ -137,8 +147,8 @@ func (s *service) onInvite(req *sip.Request, tx sip.ServerTransaction) {
 		return
 	}
 
-	leg, err := s.api.newLeg(ctx, res.CallID)
-	if err != nil || s.api.activateLeg(ctx, leg.ID, net.JoinHostPort(offer.Addr, strconv.Itoa(offer.Port))) != nil {
+	leg, err := s.api.newLeg(ctx, res.CallID, dev.UserID, secure)
+	if err != nil || s.api.activateLeg(ctx, leg.ID, net.JoinHostPort(offer.Addr, strconv.Itoa(offer.Port)), offer.Key) != nil {
 		s.api.hangup(ctx, res.CallID, dev.UserID, "cancelled")
 		_ = dlg.Respond(sip.StatusServiceUnavailable, "Service Unavailable", nil)
 		return
@@ -155,6 +165,7 @@ func (s *service) onInvite(req *sip.Request, tx sip.ServerTransaction) {
 
 	_ = dlg.Respond(sip.StatusRinging, "Ringing", nil)
 	cs.aDlg, cs.aLeg, cs.aUser = dlg, leg, dev.UserID
+	cs.aSDP = s.answerSDP(leg)
 	cs.post(event{kind: evAttachA})
 
 	select {
@@ -249,7 +260,7 @@ func (s *service) fork(cs *session, c command) {
 // inviteOne returns true if the phone answered.
 func (s *service) inviteOne(cs *session, c command, b binding) bool {
 	ctx, cancel := context.WithCancel(context.Background())
-	leg, err := s.api.newLeg(ctx, cs.id)
+	leg, err := s.api.newLeg(ctx, cs.id, c.CalleeUserID, s.cfg.requireSRTP)
 	if err != nil {
 		cancel()
 		return false
@@ -270,7 +281,7 @@ func (s *service) inviteOne(cs *session, c command, b binding) bool {
 		Params:      sip.NewParams(),
 	}
 	from.Params.Add("tag", sip.GenerateTagN(16))
-	sdp := sdpmini.Build(s.cfg.publicIP, leg.Port, time.Now().UnixNano()/1e6)
+	sdp := s.answerSDP(leg)
 	dlg, err := s.dialogCli.Invite(ctx, recipient, sdp, from, sip.NewHeader("Content-Type", "application/sdp"))
 	if err != nil {
 		cancel()
@@ -298,13 +309,16 @@ func (s *service) inviteOne(cs *session, c command, b binding) bool {
 		return false
 	}
 	answer, perr := sdpmini.Parse(dlg.InviteResponse.Body())
+	if perr == nil && s.cfg.requireSRTP && (!answer.Secure || answer.Key == nil) {
+		perr = errNoSRTP // the phone answered without SRTP although it is mandatory
+	}
 	if perr != nil || dlg.Ack(ctx) != nil {
 		_ = dlg.Bye(context.Background())
 		s.api.deleteLeg(context.Background(), leg.ID)
 		cancel()
 		return false
 	}
-	cs.post(event{kind: evBAnswered, leg: bl, remote: net.JoinHostPort(answer.Addr, strconv.Itoa(answer.Port))})
+	cs.post(event{kind: evBAnswered, leg: bl, remote: net.JoinHostPort(answer.Addr, strconv.Itoa(answer.Port)), remoteKey: answer.Key})
 	select { // the phone hangs up
 	case <-dlg.Context().Done():
 		cs.post(event{kind: evBBye, leg: bl})
@@ -332,7 +346,7 @@ func (cs *session) run() {
 	// 200 OK to the calling phone, with SDP pointing at its media leg.
 	answerA := func() {
 		if cs.aDlg != nil && attachedA && answerSDP == nil {
-			answerSDP = sdpmini.Build(s.cfg.publicIP, cs.aLeg.Port, time.Now().UnixNano()/1e6)
+			answerSDP = cs.aSDP
 			_ = cs.aDlg.RespondSDP(answerSDP)
 		}
 	}
@@ -383,7 +397,7 @@ func (cs *session) run() {
 				continue
 			}
 			// anchor the phone's media first, then tell the api (PCs then join and must find the phone leg)
-			if err := s.api.activateLeg(ctx, e.leg.legID, e.remote); err != nil {
+			if err := s.api.activateLeg(ctx, e.leg.legID, e.remote, e.remoteKey); err != nil {
 				_ = e.leg.dlg.Bye(ctx)
 				continue
 			}
@@ -421,6 +435,19 @@ func (cs *session) run() {
 			return
 		}
 	}
+}
+
+var errNoSRTP = errors.New("phone answered without SRTP")
+
+// answerSDP builds the SDP we send to a phone for one media leg: SRTP (SDES) when the leg is secure.
+func (s *service) answerSDP(leg *mediaLeg) []byte {
+	id := time.Now().UnixNano() / 1e6
+	if leg.SRTPKey != "" {
+		if key, err := base64.StdEncoding.DecodeString(leg.SRTPKey); err == nil {
+			return sdpmini.BuildSecure(s.cfg.publicIP, leg.Port, id, key)
+		}
+	}
+	return sdpmini.Build(s.cfg.publicIP, leg.Port, id)
 }
 
 func (s *service) String() string { return fmt.Sprintf("sip(%s)", s.cfg.domain) }

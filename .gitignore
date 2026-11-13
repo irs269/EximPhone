@@ -3,3 +3,4 @@ nginx/certs/
 backups/
 node_modules/
 *.log
+.load-users.ldif

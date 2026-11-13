@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -74,21 +75,26 @@ func (c *apiClient) hangup(ctx context.Context, callID string, byUser int64, as 
 }
 
 type mediaLeg struct {
-	ID   string `json:"leg_id"`
-	Port int    `json:"port"`
+	ID      string `json:"leg_id"`
+	Port    int    `json:"port"`
+	SRTPKey string `json:"srtp_key"` // our send key (base64), present when the leg is secure
 }
 
-func (c *apiClient) newLeg(ctx context.Context, callID string) (*mediaLeg, error) {
+func (c *apiClient) newLeg(ctx context.Context, callID string, userID int64, srtp bool) (*mediaLeg, error) {
 	var l mediaLeg
-	code, err := c.do(ctx, http.MethodPost, c.mediaURL+"/legs", map[string]string{"call_id": callID}, &l)
+	code, err := c.do(ctx, http.MethodPost, c.mediaURL+"/legs", map[string]any{"call_id": callID, "user_id": userID, "srtp": srtp}, &l)
 	if err == nil && code != http.StatusOK {
 		err = fmt.Errorf("media leg: %d", code)
 	}
 	return &l, err
 }
 
-func (c *apiClient) activateLeg(ctx context.Context, legID, remote string) error {
-	code, err := c.do(ctx, http.MethodPost, c.mediaURL+"/legs/"+legID+"/activate", map[string]string{"remote": remote}, nil)
+func (c *apiClient) activateLeg(ctx context.Context, legID, remote string, remoteKey []byte) error {
+	body := map[string]string{"remote": remote}
+	if remoteKey != nil {
+		body["srtp_key"] = base64.StdEncoding.EncodeToString(remoteKey)
+	}
+	code, err := c.do(ctx, http.MethodPost, c.mediaURL+"/legs/"+legID+"/activate", body, nil)
 	if err == nil && code != http.StatusNoContent {
 		err = fmt.Errorf("media activate: %d", code)
 	}

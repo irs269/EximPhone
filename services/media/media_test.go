@@ -38,6 +38,7 @@ func newTestServer(t *testing.T) (*httptest.Server, *manager) {
 	}
 	r := chi.NewRouter()
 	routes(m, testSecret, testToken)(r)
+	t.Cleanup(m.close)
 	return httptest.NewServer(r), m
 }
 

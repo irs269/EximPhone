@@ -28,6 +28,7 @@ func (a *app) internalRoutes(r chi.Router) {
 	r.Post("/calls", a.internalCreateCall)
 	r.Post("/calls/{id}/answered", a.internalAnswered)
 	r.Post("/calls/{id}/hangup", a.internalHangup)
+	r.Post("/recordings", a.internalRecordings)
 }
 
 // internalCreateCall: a desk phone dials an extension. Same routing rules as a PC call.
@@ -68,7 +69,8 @@ func (a *app) internalAnswered(w http.ResponseWriter, r *http.Request) {
 	}
 	a.enterCall(ctx, caller)
 	a.enterCall(ctx, callee)
-	a.hub.publish(ctx, []int64{caller, callee}, "call_answered", map[string]any{"call_id": id, "via": "sip", "answered_by": strconv.FormatInt(callee, 10)})
+	recorded := a.maybeRecord(ctx, id, caller, callee)
+	a.hub.publish(ctx, []int64{caller, callee}, "call_answered", map[string]any{"call_id": id, "via": "sip", "answered_by": strconv.FormatInt(callee, 10), "recorded": recorded})
 	w.WriteHeader(http.StatusNoContent)
 }
 

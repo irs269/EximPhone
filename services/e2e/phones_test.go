@@ -3,8 +3,8 @@
 package e2e
 
 import (
+	"bytes"
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -17,8 +17,6 @@ import (
 
 	"github.com/emiago/sipgo"
 )
-
-func asResp(err error, target **sipgo.ErrDialogResponse) bool { return errors.As(err, target) }
 
 type account struct{ id, user, pass string }
 
@@ -244,7 +242,7 @@ func TestPhones(t *testing.T) {
 			ch <- result{dlg: dlg, rtp: fmt.Sprintf("%s:%d", ans.Addr, ans.Port)}
 		}()
 		in := waitInvite(t, phoneM)
-		in.answer <- sdpAnswer(phoneM)
+		in.answer <- phoneM.answerFor(in.offer)
 		r := <-ch
 		if r.dlg == nil {
 			t.Fatalf("call failed: %d", r.err)
@@ -265,6 +263,150 @@ func TestPhones(t *testing.T) {
 		case <-time.After(5 * time.Second):
 			t.Fatal("callee did not get the BYE")
 		}
+	})
+
+	t.Run("call recording: department rule, sealed storage, audited access", func(t *testing.T) {
+		hangupAll(t, omar.token, mariam.token, idrissa.token)
+		_, org := call(t, admin.token, "GET", "/api/meta/org", nil)
+		_, users := call(t, admin.token, "GET", "/api/admin/users", nil)
+		deptName := ""
+		for _, u := range users["users"].([]any) {
+			if m := u.(map[string]any); int64(m["id"].(float64)) == mariam.id {
+				deptName = fmt.Sprint(m["department"])
+			}
+		}
+		deptID := 0
+		for _, d := range org["departments"].([]any) {
+			if m := d.(map[string]any); m["name"] == deptName {
+				deptID = int(m["id"].(float64))
+			}
+		}
+		if deptID == 0 {
+			t.Fatalf("department of %s not found", mariam.name)
+		}
+		if code, out := call(t, admin.token, "PUT", "/api/admin/recording-rules", map[string]any{"department_id": deptID, "enabled": true}); code != 204 {
+			t.Fatalf("rule: %d %v", code, out)
+		}
+		t.Cleanup(func() {
+			call(t, admin.token, "PUT", "/api/admin/recording-rules", map[string]any{"department_id": deptID, "enabled": false})
+		})
+		auditor := login(t, "kseif")
+		call(t, admin.token, "PUT", fmt.Sprintf("/api/admin/users/%d/roles", auditor.id), map[string]any{"roles": []string{"auditor"}})
+		t.Cleanup(func() {
+			call(t, admin.token, "PUT", fmt.Sprintf("/api/admin/users/%d/roles", auditor.id), map[string]any{"roles": []string{}})
+		})
+
+		// a recorded call: desk phone (caller) to PC
+		omar.reset()
+		mariam.reset()
+		ch := make(chan string, 1)
+		go func() {
+			_, ans, code := phoneM.invite(omar.ext)
+			if ans == nil {
+				ch <- fmt.Sprint("fail:", code)
+				return
+			}
+			ch <- fmt.Sprintf("%s:%d", ans.Addr, ans.Port)
+		}()
+		inc := omar.wait("call_incoming", func(d map[string]any) bool { return int64(d["from"].(map[string]any)["id"].(float64)) == mariam.id })
+		id := fmt.Sprint(inc["call_id"])
+		call(t, omar.token, "POST", "/api/calls/"+id+"/answer", nil)
+		ev := omar.wait("call_answered", func(d map[string]any) bool { return d["call_id"] == id })
+		if ev["recorded"] != true {
+			t.Fatalf("call_answered must announce the recording to the clients: %v", ev)
+		}
+		rtpAddr := <-ch
+		leg := omar.joinMedia(id)
+		stop := make(chan struct{})
+		phoneM.sendRTP(rtpAddr, 0xA1, stop)
+		leg.stream(0xB1, stop)
+		leg.expect(t, 0xA1)
+		time.Sleep(2500 * time.Millisecond) // at least two seconds of audio per direction
+		close(stop)
+		call(t, omar.token, "POST", "/api/calls/"+id+"/hangup", nil)
+
+		var recs []any
+		eventually(t, "both directions are sealed, stored and registered", func() bool {
+			_, out := call(t, auditor.token, "GET", "/api/recordings", nil)
+			recs = nil
+			for _, r := range out["recordings"].([]any) {
+				if r.(map[string]any)["call_id"] == id {
+					recs = append(recs, r)
+				}
+			}
+			return len(recs) == 2
+		})
+		for _, r := range recs {
+			m := r.(map[string]any)
+			req, _ := http.NewRequest("GET", base+"/api/recordings/"+fmt.Sprint(m["id"])+"/download", nil)
+			req.Header.Set("Authorization", "Bearer "+auditor.token)
+			res, err := httpc.Do(req)
+			if err != nil || res.StatusCode != 200 {
+				t.Fatalf("download: %v %v", err, res)
+			}
+			b, _ := io.ReadAll(res.Body)
+			res.Body.Close()
+			want := byte(0xB1)
+			if m["track"] == "caller" {
+				want = 0xA1 // the caller is the desk phone
+			}
+			if string(b[:4]) != "RIFF" || string(b[8:12]) != "WAVE" || b[20] != 7 {
+				t.Fatalf("%v is not a mu-law WAV", m["track"])
+			}
+			if n := bytes.Count(b[58:], []byte{want}); n < 8000 {
+				t.Fatalf("track %v holds only %d samples of the expected speaker", m["track"], n)
+			}
+		}
+		t.Log("both directions recorded, decrypted for the auditor and containing the right speaker")
+
+		if code, _ := call(t, omar.token, "GET", "/api/recordings", nil); code != 403 {
+			t.Fatalf("a non-auditor must not list recordings: %d", code)
+		}
+		_, a := call(t, auditor.token, "GET", "/api/audit?action=recording_accessed&limit=5", nil)
+		if len(a["entries"].([]any)) < 2 {
+			t.Fatalf("every recording access must be audited: %v", a)
+		}
+	})
+
+	t.Run("SIP over TLS registration", func(t *testing.T) {
+		tlsPhone := newSoftphone(t, mariam.ext, devM.user, devM.pass, "SHA-256", 5094)
+		tlsPhone.tlsMode = true
+		if code := tlsPhone.register(60); code != 200 {
+			t.Fatalf("REGISTER over TLS (port 5061): %d", code)
+		}
+	})
+
+	t.Run("SRTP: the desk phone encrypts its audio end to end to the media server", func(t *testing.T) {
+		hangupAll(t, omar.token, mariam.token, idrissa.token)
+		omar.reset()
+		phoneM.register(300) // refresh the binding (the TLS registration above replaced it)
+		phoneM.srtp = true
+		t.Cleanup(func() { phoneM.srtp, phoneM.sendCtx, phoneM.recvCtx = false, nil, nil })
+
+		// phone -> PC
+		ch := make(chan string, 1)
+		go func() {
+			_, ans, code := phoneM.invite(omar.ext)
+			if ans == nil {
+				ch <- fmt.Sprint("fail:", code)
+				return
+			}
+			ch <- fmt.Sprintf("%s:%d", ans.Addr, ans.Port)
+		}()
+		inc := omar.wait("call_incoming", func(d map[string]any) bool { return int64(d["from"].(map[string]any)["id"].(float64)) == mariam.id })
+		id := fmt.Sprint(inc["call_id"])
+		call(t, omar.token, "POST", "/api/calls/"+id+"/answer", nil)
+		rtpAddr := <-ch
+		leg := omar.joinMedia(id)
+		stop := make(chan struct{})
+		phoneM.sendRTP(rtpAddr, 0xE1, stop)
+		leg.stream(0xE2, stop)
+		leg.expect(t, 0xE1)    // the PC receives what the phone sent (decrypted by media)
+		phoneM.expectRTP(0xE2) // the phone receives SRTP: expectRTP fails if the audio is visible on the wire
+		close(stop)
+		call(t, omar.token, "POST", "/api/calls/"+id+"/hangup", nil)
+		eventually(t, "BYE after the SRTP call", func() bool { _, b := phoneM.counts(); return b >= 1 })
+		t.Log("SRTP call: audio encrypted on the phone leg in both directions")
 	})
 
 	t.Run("provisioning by MAC", func(t *testing.T) {
