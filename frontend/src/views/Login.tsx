@@ -22,7 +22,7 @@ export function Login() {
       <div className="brand">
         <img src="/brand/logo-white.svg" alt="Exim Bank" />
         <div>
-          <h1>Exim<span>Phone</span></h1>
+          <h1>Exim<span>Connect</span></h1>
           <p>{t('login.brandText')}</p>
         </div>
         <div className="feats">

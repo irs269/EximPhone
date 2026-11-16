@@ -73,6 +73,6 @@ SQL_RANGES="$(echo "$CIDRS" | sed "s/,/','/g")"
 set -a; . ./.env; set +a
 docker compose -f docker-compose.yml -f docker-compose.test.yml exec -T postgres psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v ON_ERROR_STOP=1 -q   -c "UPDATE sites SET ip_ranges = ARRAY['$SQL_RANGES']::cidr[]"
 echo
-echo "EximPhone is up: https://$IP  (accept the self-signed certificate)"
+echo "Exim Connect is up: https://$IP  (accept the self-signed certificate)"
 echo "Test accounts and passwords: credentials.txt  (asaid is the IT administrator)"
 echo "Firewall: allow 443/tcp, 10000-10200/udp, 3478/udp+tcp, 49152-49200/udp (5060-5061 only for desk phones)."

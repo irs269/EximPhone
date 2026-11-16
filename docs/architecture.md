@@ -1,6 +1,6 @@
 # Architecture
 
-EximPhone runs entirely on Exim Bank servers: nothing depends on the Internet in production, and every business service (SIP, media, chat, presence, attendance) is our own code. Third-party software is limited to libraries (sipgo, pion, chi, pgx) and standard infrastructure (PostgreSQL, Redis, Nginx, an S3-compatible store).
+Exim Connect runs entirely on Exim Bank servers: nothing depends on the Internet in production, and every business service (SIP, media, chat, presence, attendance) is our own code. Third-party software is limited to libraries (sipgo, pion, chi, pgx) and standard infrastructure (PostgreSQL, Redis, Nginx, an S3-compatible store).
 
 ## Services
 

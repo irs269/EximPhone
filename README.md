@@ -1,4 +1,6 @@
-# EximPhone
+# Exim Connect
+
+> Product name: **Exim Connect** (formerly EximPhone). The repository, container, database and variable names keep the `eximphone` name on purpose, so existing installations and backups keep working.
 
 Internal communication and attendance platform for Exim Bank. Full spec: [docs/PROMPT_EximPhone.md](docs/PROMPT_EximPhone.md). Reference UI: [prototype/eximphone.html](prototype/eximphone.html).
 
@@ -37,7 +39,7 @@ Windows: `./scripts/make.ps1 dev`. Then open https://localhost (self-signed cert
 ## Frontend and desktop
 
 - `frontend/`: React 18 + TypeScript + Vite. Brand tokens live in `src/theme/tokens.ts` (no hard-coded colors elsewhere). `npm run dev` (proxies `/api` to https://localhost), `npm test`, `npm run build`. The production build is baked into the nginx image (`frontend/Dockerfile`).
-- `desktop/`: Electron shell that opens the server URL (`EXIM_URL`, or `%APPDATA%/EximPhone/config.json` `{"url": "..."}`; default https://localhost). `npm start` to try, `npm run dist` for the Windows installer. TLS uses the Windows trust store: install the bank CA there. The installer still needs a branded `icon.ico` (256x256).
+- `desktop/`: Electron shell that opens the server URL (`EXIM_URL`, or `%APPDATA%/Exim Connect/config.json` `{"url": "..."}`; default https://localhost). `npm start` to try, `npm run dist` for the Windows installer. TLS uses the Windows trust store: install the bank CA there. The installer still needs a branded `icon.ico` (256x256).
 
 Phase 4 (PC to PC calls) done: see [docs/calls.md](docs/calls.md). WebRTC audio relayed by `media`, in-house `turn`, signaling over the WebSocket, call journal, hold, mute, blind transfer, busy/DND handling. Verified with two real browsers through the Docker stack; the microphone could not be tested in the automation browser (listen-only fallback was used).
 
