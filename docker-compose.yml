@@ -41,6 +41,8 @@ services:
       redis: {condition: service_healthy}
       garage: {condition: service_healthy}
     networks: [back, data]
+    volumes:
+      - ./mail/ca:/mail-ca:ro   # optional: put the mail server's CA certificate here as ca.pem (MAIL_CA_FILE=/mail-ca/ca.pem)
     environment:
       <<: *go-env
       DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?sslmode=disable
