@@ -7,9 +7,10 @@ import { useCalls } from './calls';
 import { useAnn } from './ann';
 import { useTickets } from './tickets';
 import { useMail } from './mail';
+import { useMeetings } from './meetings';
 import type { Presence } from '../data/mock';
 
-export type View = 'chat' | 'phone' | 'dir' | 'att' | 'ann' | 'tickets' | 'mail' | 'team' | 'audit' | 'help';
+export type View = 'chat' | 'phone' | 'dir' | 'att' | 'ann' | 'tickets' | 'mail' | 'meetings' | 'team' | 'audit' | 'help';
 export type Dialog =
   | { kind: 'arrival'; resumed: boolean }
   | { kind: 'logout'; summary: LogoutSummary }
@@ -69,6 +70,7 @@ export const useApp = create<State>((set, get) => ({
         void useAnn.getState().load();
         void useTickets.getState().loadSummary();
         void useMail.getState().loadCounts();
+        void useMeetings.getState().load();
         return;
       }
     } catch { /* fall through to login */ }
@@ -86,6 +88,7 @@ export const useApp = create<State>((set, get) => ({
       void useAnn.getState().load();
         void useTickets.getState().loadSummary();
         void useMail.getState().loadCounts();
+        void useMeetings.getState().load();
     } catch (e) {
       set({ loginError: loginMessage(e) });
     }
@@ -107,6 +110,7 @@ export const useApp = create<State>((set, get) => ({
       useAnn.getState().reset();
       useTickets.getState().reset();
       useMail.getState().reset();
+      useMeetings.getState().reset();
       useCalls.getState().reset();
       set({ phase: 'out', user: null, roles: ['employee'], today: null,
         dialog: { kind: 'bye', time: r.clock_out, durationMin: r.duration_min, name } });

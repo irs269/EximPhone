@@ -136,6 +136,16 @@ export const fr = {
   'mail.err.noRecipient': 'Ajoutez au moins un destinataire.', 'mail.err.generic': "L'envoi a échoué. Vérifiez les destinataires et les pièces jointes.",
   'mail.err.upload': 'Fichier refusé : exécutables et scripts interdits, 20 Mo maximum.',
   'mail.err.external': "L'envoi vers des adresses externes n'est pas configuré sur ce serveur.", 'mail.addAddress': 'Ajouter {address}', 'mail.external': 'Externe',
+  'nav.meetings': 'Réunions',
+  'meet.new': 'Nouvelle réunion', 'meet.newHint': "Invitez jusqu'à 11 personnes", 'meet.title': 'Titre', 'meet.titleDefault': 'Réunion', 'meet.start': 'Démarrer la réunion',
+  'meet.pickedCount': '{n} invité(s)', 'meet.err.start': "Impossible de démarrer ou de rejoindre la réunion.", 'meet.err.negotiation': 'Problème de connexion vidéo. Quittez puis rejoignez à nouveau.',
+  'meet.full': 'La réunion est complète (12 personnes).', 'meet.declined': "Votre correspondant a refusé l'appel vidéo.", 'meet.noMic': 'Microphone indisponible : vous pouvez seulement écouter.', 'meet.noCam': 'Caméra indisponible ou refusée.',
+  'meet.people': '{n} participant(s)', 'meet.connecting': 'Connexion…', 'meet.muted': 'micro coupé', 'meet.sharing': 'partage son écran', 'meet.screenOf': 'Écran de {name}',
+  'meet.participants': 'Participants', 'meet.invite': 'Inviter', 'meet.mute': 'Couper le micro', 'meet.unmute': 'Activer le micro', 'meet.camOn': 'Activer la caméra', 'meet.camOff': 'Couper la caméra',
+  'meet.share': "Partager l'écran", 'meet.stopShare': 'Arrêter le partage', 'meet.leave': 'Quitter', 'meet.endAll': 'Terminer pour tous',
+  'meet.incomingCall': 'Appel vidéo entrant', 'meet.invitation': 'Invitation à une réunion', 'meet.join': 'Rejoindre', 'meet.videoCall': 'Appel vidéo',
+  'meet.active': 'En cours', 'meet.recent': 'Récentes', 'meet.empty': 'Démarrez une réunion ou rejoignez-en une en cours.', 'meet.host': 'Organisateur : {name}', 'meet.joined': '{n} connecté(s)', 'meet.ended': 'Terminée',
+  'meet.hint': "La caméra et le partage d'écran demandent votre autorisation dans le navigateur.", 'meet.none': 'Aucune réunion.', 'meet.call': 'Appel vidéo',
   'toast.status': 'Statut : {s}',
 } as const;
 export type Key = keyof typeof fr;

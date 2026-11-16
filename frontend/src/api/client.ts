@@ -246,3 +246,20 @@ export async function mailAttachmentUrl(id: string): Promise<string> {
   if (!res.ok) throw new ApiError(res.status, 'download failed');
   return URL.createObjectURL(await res.blob());
 }
+
+// ---- meetings and video calls ----
+export interface MeetingPerson { id: number; name: string; status: 'invited' | 'joined' | 'declined' | 'left' }
+export interface Meeting {
+  id: string; title: string; kind: 'meeting' | 'video_call'; host_id: number; host: string; created_at: string; ended_at: string | null;
+  me: string; participants: MeetingPerson[];
+}
+export interface MeetingInvite { id: string; title: string; kind: 'meeting' | 'video_call'; host_id: number; host: string }
+
+export const meetings = (view: 'active' | 'recent') => request<{ meetings: Meeting[] }>(`/meetings?view=${view}`);
+export const meeting = (id: string) => request<Meeting>(`/meetings/${id}`);
+export const createMeeting = (b: { title?: string; kind?: 'meeting' | 'video_call'; invitees: number[] }) => post<Meeting>('/meetings', b);
+export const meetingToken = (id: string) => post<{ token: string; title: string; kind: 'meeting' | 'video_call'; host_id: number }>(`/meetings/${id}/token`);
+export const meetingInvite = (id: string, user_ids: number[]) => post<Meeting>(`/meetings/${id}/invite`, { user_ids });
+export const meetingDecline = (id: string) => post<unknown>(`/meetings/${id}/decline`);
+export const meetingLeave = (id: string) => post<unknown>(`/meetings/${id}/leave`);
+export const meetingEnd = (id: string) => post<unknown>(`/meetings/${id}/end`);

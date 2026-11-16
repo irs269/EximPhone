@@ -94,6 +94,9 @@ func (r *room) hasSIP() bool {
 
 type manager struct {
 	opusAPI, g711API *webrtc.API
+	meetAPI          *webrtc.API // opus + VP8 with NACK/PLI, for meetings
+	meet             *meetings
+	internalToken    string
 	log              *slog.Logger
 	publicIP         string
 	sipMin, sipMax   int
@@ -139,11 +142,17 @@ func newManager(publicIP string, minPort, maxPort uint16, log *slog.Logger) (*ma
 	if err != nil {
 		return nil, err
 	}
-	return &manager{
-		opusAPI: opusAPI, g711API: g711API, log: log, publicIP: publicIP, mux: conn,
+	meetAPI, err := newMeetAPI(se)
+	if err != nil {
+		return nil, err
+	}
+	m := &manager{
+		opusAPI: opusAPI, g711API: g711API, meetAPI: meetAPI, log: log, publicIP: publicIP, mux: conn,
 		sipMin: int(minPort) + 1, sipMax: int(maxPort),
 		rooms: map[string]*room{}, legs: map[string]*sipLeg{}, recs: map[string]recordingConfig{},
-	}, nil
+	}
+	m.meet = newMeetings(m)
+	return m, nil
 }
 
 // close ends every call and releases the shared UDP port (used on shutdown and by tests).
@@ -159,6 +168,15 @@ func (m *manager) close() {
 	m.mu.Unlock()
 	for _, id := range ids {
 		m.closeRoom(id)
+	}
+	m.meet.mu.Lock()
+	meetIDs := make([]string, 0, len(m.meet.rooms))
+	for id := range m.meet.rooms {
+		meetIDs = append(meetIDs, id)
+	}
+	m.meet.mu.Unlock()
+	for _, id := range meetIDs {
+		m.meet.end(id)
 	}
 	_ = m.mux.Close()
 }

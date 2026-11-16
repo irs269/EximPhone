@@ -4,6 +4,7 @@ import { t } from '../i18n';
 import { Icon } from '../components/Icon';
 import { UserAvatar } from '../components/Avatar';
 import { useCalls } from '../store/calls';
+import { startVideoCall } from '../store/meetings';
 
 const label: Record<string, string> = {
   on: 'status.on', busy: 'status.busy', meet: 'status.meet', away: 'status.away', dnd: 'status.dnd',
@@ -28,6 +29,7 @@ export function Directory() {
           <div className="info"><b>{u.display_name}</b><span>{u.department}</span></div>
           <div className="acts">
             {u.extension && <button className="btn" onClick={() => void dial(u.id)}><Icon name="call" /> {t('call.call')}</button>}
+            <button className="btn" onClick={() => void startVideoCall(u.id)}><Icon name="video" /> {t('meet.call')}</button>
             <button className="btn gold" onClick={async () => { await startDirect(u.id); setView('chat'); }}><Icon name="chat" /> {t('dir.message')}</button>
           </div>
           <div className="rows">

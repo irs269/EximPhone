@@ -6,6 +6,6 @@ export default defineConfig({
   base: './', // relative paths so the same build works under nginx and inside Electron
   server: { proxy: {
     '/api': { target: 'https://localhost', secure: false, ws: true },
-    '/media': { target: 'https://localhost', secure: false },
+    '/media': { target: 'https://localhost', secure: false, ws: true },
   } },
 });

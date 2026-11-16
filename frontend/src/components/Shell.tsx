@@ -19,6 +19,10 @@ import { Directory } from '../views/Directory';
 import { Help, faqIds } from '../views/Help';
 import { Tickets, StatusPill } from '../views/Tickets';
 import { Mail, mailDate } from '../views/Mail';
+import { Meetings } from '../views/Meetings';
+import { MeetingRoom, MeetingInvite } from './MeetingRoom';
+import { NewMeetingDialog } from './NewMeetingDialog';
+import { useMeetings } from '../store/meetings';
 import { MailComposer } from './MailComposer';
 import { useMail } from '../store/mail';
 import type { MailFolder } from '../api/client';
@@ -35,6 +39,7 @@ const nav: { v: View; icon: IconName; label: Parameters<typeof t>[0] }[] = [
   { v: 'chat', icon: 'chat', label: 'nav.messages' },
   { v: 'mail', icon: 'mail', label: 'nav.mail' },
   { v: 'phone', icon: 'phone', label: 'nav.calls' },
+  { v: 'meetings', icon: 'video', label: 'nav.meetings' },
   { v: 'dir', icon: 'dir', label: 'nav.directory' },
   { v: 'att', icon: 'clock', label: 'nav.attendance' },
   { v: 'ann', icon: 'ann', label: 'nav.announcements' },
@@ -98,7 +103,7 @@ function StatusMenu() {
 function ListPane() {
   const s = useApp();
   const q = s.query.toLowerCase();
-  const titles: Record<View, Parameters<typeof t>[0]> = { chat: 'nav.messages', mail: 'nav.mail', phone: 'nav.calls', dir: 'nav.directory', att: 'nav.attendance', ann: 'nav.announcements', tickets: 'nav.tickets', team: 'nav.team', audit: 'nav.audit', help: 'nav.help' };
+  const titles: Record<View, Parameters<typeof t>[0]> = { chat: 'nav.messages', mail: 'nav.mail', phone: 'nav.calls', meetings: 'nav.meetings', dir: 'nav.directory', att: 'nav.attendance', ann: 'nav.announcements', tickets: 'nav.tickets', team: 'nav.team', audit: 'nav.audit', help: 'nav.help' };
   const annItems = useAnn((a) => a.items);
   const chat = useChat();
   const calls = useCalls();
@@ -110,6 +115,8 @@ function ListPane() {
   }, [q, s.view]);
   const tk = useTickets();
   const mail = useMail();
+  const meet = useMeetings();
+  useEffect(() => { if (s.view === 'meetings') void meet.load(); }, [s.view]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { if (s.view === 'mail') { void mail.loadList(); void mail.loadCounts(); } }, [s.view]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (s.view !== 'mail' || s.query === mail.q) return;
@@ -173,6 +180,18 @@ function ListPane() {
     ));
   } else if (s.view === 'team' || s.view === 'audit') {
     items = [];
+  } else if (s.view === 'meetings') {
+    items = [
+      <button key="new" className="btn gold newbtn" onClick={() => meet.setComposing(true)}>+ {t('meet.new')}</button>,
+      <div className="sec" key="h">{t('meet.active')}</div>,
+      ...meet.active.map((m) => (
+        <button key={m.id} className="it" onClick={() => { void meet.join(m.id); }}>
+          <div className="av" style={{ background: 'var(--ok)' }}><Icon name="video" size={16} /></div>
+          <div className="t"><div className="n">{m.kind === 'video_call' ? t('meet.videoCall') : m.title}<small>{hm(m.created_at)}</small></div><div className="s">{t('meet.host', { name: m.host })}</div></div>
+        </button>
+      )),
+      ...(meet.active.length === 0 ? [<div className="sec" key="none" style={{ color: 'var(--muted)' }}>{t('meet.none')}</div>] : []),
+    ];
   } else if (s.view === 'mail') {
     const folders: MailFolder[] = ['inbox', 'starred', 'sent', 'drafts', 'archive', 'trash'];
     const counter = (f: MailFolder) => (f === 'inbox' && mail.counts.unread_inbox > 0 ? ` (${mail.counts.unread_inbox})` : f === 'drafts' && mail.counts.drafts > 0 ? ` (${mail.counts.drafts})` : '');
@@ -266,6 +285,7 @@ export function Shell() {
           {view === 'help' && <Help />}
           {view === 'tickets' && <Tickets />}
           {view === 'mail' && <Mail />}
+          {view === 'meetings' && <Meetings />}
         </main>
       </div>
       <StatusMenu />
@@ -273,6 +293,9 @@ export function Shell() {
       <NewChatDialog />
       <NewTicketDialog />
       <MailComposer />
+      <NewMeetingDialog />
+      <MeetingInvite />
+      <MeetingRoom />
       <UrgentDialog />
       <Dialogs />
       <div id="toast" className={toast ? 'show' : ''} role="status" aria-live="polite">{toast}</div>

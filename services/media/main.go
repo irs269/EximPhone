@@ -29,7 +29,20 @@ type mediaClaims struct {
 }
 
 func routes(m *manager, jwtSecret []byte, internalToken string) func(chi.Router) {
+	m.internalToken = internalToken
 	return func(r chi.Router) {
+		// Meetings: SFU signalling over a WebSocket (first frame carries the token issued by the api).
+		r.Get("/meetings/{id}/ws", m.meet.serve(jwtSecret))
+		// Called by the api when the host ends a meeting.
+		r.Delete("/meetings/{id}", func(w http.ResponseWriter, req *http.Request) {
+			if subtle.ConstantTimeCompare([]byte(req.Header.Get("X-Internal-Token")), []byte(internalToken)) != 1 {
+				http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
+				return
+			}
+			m.meet.end(chi.URLParam(req, "id"))
+			w.WriteHeader(http.StatusNoContent)
+		})
+
 		// Called by the browser. The short-lived token is issued by the api for one user and one call.
 		r.Post("/calls/{id}/offer", func(w http.ResponseWriter, req *http.Request) {
 			callID := chi.URLParam(req, "id")

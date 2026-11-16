@@ -50,3 +50,5 @@ Phase 6 (announcements, HR, RBAC, audit) done: see [docs/hr-admin.md](docs/hr-ad
 Service tickets (file for a service, head approves or rejects, then assigns to a member): see [docs/tickets.md](docs/tickets.md). English and French UI with a language switch; Help view with IT contacts and FAQ.
 
 Internal mail (compose with To/Cc/Bcc, drafts, conversations, attachments, folders, search): see [docs/mail.md](docs/mail.md). External mail (SMTP relay and IMAP mailbox of the existing mail server) is supported and optional: see the settings in that document.
+
+Video meetings (up to 12 people), video calls and screen sharing through an SFU in the media service: see [docs/meetings.md](docs/meetings.md). Remote control of a shared screen is planned as the next stage.

@@ -18,6 +18,8 @@ const defs: Record<string, [Style, ReactNode]> = {
   pause: ['fill', <><rect x="6" y="4" width="4" height="16" /><rect x="14" y="4" width="4" height="16" /></>],
   transfer: ['stroke', <path d="M17 3l4 4-4 4M21 7H9M7 21l-4-4 4-4M3 17h12" />],
   grid: ['fill', <>{[5, 12, 19].flatMap((y) => [5, 12, 19].map((x) => <circle key={`${x}${y}`} cx={x} cy={y} r="2" />))}</>],
+  video: ['stroke', <><rect x="2" y="6" width="14" height="12" rx="2" /><path d="M22 8l-6 4 6 4z" /></>],
+  screen: ['stroke', <><rect x="2" y="4" width="20" height="13" rx="2" /><path d="M8 21h8M12 17v4" /></>],
   mail: ['stroke', <><rect x="3" y="5" width="18" height="14" rx="2" /><path d="M3 7l9 6 9-6" /></>],
   clip: ['stroke', <path d="M21 11l-8.5 8.5a5 5 0 0 1-7-7L14 4a3.5 3.5 0 0 1 5 5l-8.5 8.5a2 2 0 0 1-3-3L15 7" />],
   ticket: ['stroke', <path d="M3 8a2 2 0 0 0 2-2h14a2 2 0 0 0 2 2v2a2 2 0 0 0 0 4v2a2 2 0 0 0-2 2H5a2 2 0 0 0-2-2v-2a2 2 0 0 0 0-4zM9 6v12" />],

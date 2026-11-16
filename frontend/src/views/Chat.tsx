@@ -3,6 +3,7 @@ import { attachmentUrl, ApiError, uploadAttachment, type Message } from '../api/
 import { useApp } from '../store/app';
 import { convTitle, useChat } from '../store/chat';
 import { t } from '../i18n';
+import { startVideoCall } from '../store/meetings';
 import { Icon } from '../components/Icon';
 import { GroupAvatar, UserAvatar } from '../components/Avatar';
 import { useCalls } from '../store/calls';
@@ -96,6 +97,7 @@ export function Chat() {
       <div className="top">
         {other ? <UserAvatar u={other} status={useChat.getState().presence[other.id]} /> : <GroupAvatar />}
         <div className="tt"><b>{title}</b><span>{sub}</span></div>
+        {other && <button className="ib" aria-label={t('meet.call')} title={t('meet.call')} onClick={() => void startVideoCall(other.id)}><Icon name="video" /></button>}
         {other && other.extension && <button className="ib" aria-label={t('call.call')} onClick={() => void useCalls.getState().dial(other.id)}><Icon name="call" /></button>}
       </div>
       <div className="msgs" role="log" aria-live="polite">

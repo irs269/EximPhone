@@ -80,6 +80,18 @@ server {
         proxy_set_header Host $http_host;
     }
 
+    # Meeting signalling: a WebSocket to the SFU (the media itself goes straight to media over UDP).
+    location ~ ^/media/meetings/[0-9a-f-]+/ws$ {
+        set $media_upstream http://media:8080;
+        rewrite ^/media/(.*)$ /$1 break;
+        proxy_pass $media_upstream;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $http_host;
+        proxy_read_timeout 7200s;
+    }
+
     location /prov/ {
         set $prov_upstream http://provisioning:8080;
         rewrite ^/prov/(.*)$ /$1 break;
