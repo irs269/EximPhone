@@ -294,3 +294,4 @@ button.it{width:100%;text-align:left;font:inherit;color:inherit}
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
 .mailc-f{align-items:center;padding-top:14px;flex-wrap:wrap}
 .mailc-f .btn{flex:none!important}
+.chip.ext{background:var(--hover);color:var(--navy)}

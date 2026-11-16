@@ -1,9 +1,29 @@
 # Development override: debug logs + OpenLDAP with 20 fictional employees.
 services:
   api:
-    environment: {LOG_LEVEL: debug}
+    environment:
+      LOG_LEVEL: debug
+      # external mail against the GreenMail test server below (plain, no authentication)
+      MAIL_SMTP_HOST: greenmail
+      MAIL_SMTP_PORT: "3025"
+      MAIL_SMTP_SECURITY: none
+      MAIL_IMAP_HOST: greenmail
+      MAIL_IMAP_PORT: "3143"
+      MAIL_IMAP_SECURITY: none
+      MAIL_IMAP_USER: relay
+      MAIL_IMAP_PASSWORD: relaypw
+      MAIL_DOMAIN: exim.local
+      MAIL_POLL_SECONDS: "3"
     depends_on:
       ldap-mock: {condition: service_healthy}
+      greenmail: {condition: service_started}
+  # Fake external mail world for development and tests: an SMTP relay and an IMAP mailbox (dev only).
+  greenmail:
+    image: greenmail/standalone:2.1.0
+    environment:
+      GREENMAIL_OPTS: -Dgreenmail.setup.test.smtp -Dgreenmail.setup.test.imap -Dgreenmail.hostname=0.0.0.0 -Dgreenmail.auth.disabled -Dgreenmail.users=relay:relaypw@exim.local,ext:extpw@partner.test
+    ports: ["127.0.0.1:3025:3025", "127.0.0.1:3143:3143"]
+    networks: [back]
   ldap-mock:
     image: osixia/openldap:1.5.0
     command: ["--copy-service"]

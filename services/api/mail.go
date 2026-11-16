@@ -68,8 +68,9 @@ func (a *app) mailOpen(kind string, id int64, sealed []byte) string {
 }
 
 type mailPerson struct {
-	ID   int64  `json:"id"`
-	Name string `json:"name"`
+	ID    int64  `json:"id"`
+	Name  string `json:"name"`
+	Email string `json:"email,omitempty"` // set for people outside the platform (id 0)
 }
 
 type mailAttachment struct {
@@ -116,7 +117,7 @@ func (a *app) mailFolders(w http.ResponseWriter, r *http.Request) {
 		       COUNT(*) FILTER (WHERE folder='drafts'),
 		       COUNT(*) FILTER (WHERE starred AND folder NOT IN ('trash','drafts'))
 		FROM mail_boxes WHERE user_id=$1 AND NOT purged`, uid).Scan(&inbox, &drafts, &starred)
-	writeJSON(w, 200, map[string]any{"unread_inbox": inbox, "drafts": drafts, "starred": starred})
+	writeJSON(w, 200, map[string]any{"unread_inbox": inbox, "drafts": drafts, "starred": starred, "external": mailCfg.outbound()})
 }
 
 // ---------- listing and search ----------
@@ -124,6 +125,7 @@ func (a *app) mailFolders(w http.ResponseWriter, r *http.Request) {
 type mailRow struct {
 	id, thread, sender int64
 	senderName         string
+	senderEmail        string
 	ts                 time.Time
 	read, starred      bool
 	subject, body      []byte
@@ -150,8 +152,9 @@ func (a *app) mailList(w http.ResponseWriter, r *http.Request) {
 		cols = `m.subject, m.body`
 	}
 	rows, err := a.st.db.Query(ctx, `
-		SELECT m.id, m.thread_id, m.sender_id, su.display_name, COALESCE(m.sent_at, m.updated_at), b.is_read, b.starred, `+cols+`
-		FROM mail_boxes b JOIN mail_messages m ON m.id=b.message_id JOIN users su ON su.id=m.sender_id
+		SELECT m.id, m.thread_id, COALESCE(m.sender_id,0), COALESCE(su.display_name, NULLIF(m.external_name,''), m.external_address, ''), COALESCE(m.external_address,''),
+		       COALESCE(m.sent_at, m.updated_at), b.is_read, b.starred, `+cols+`
+		FROM mail_boxes b JOIN mail_messages m ON m.id=b.message_id LEFT JOIN users su ON su.id=m.sender_id
 		WHERE b.user_id=$1 AND NOT b.purged AND `+pred+`
 		ORDER BY COALESCE(m.sent_at, m.updated_at) DESC, m.id DESC LIMIT $2`, uid, mailWindow)
 	if err != nil {
@@ -161,7 +164,7 @@ func (a *app) mailList(w http.ResponseWriter, r *http.Request) {
 	var all []mailRow
 	for rows.Next() {
 		var x mailRow
-		if rows.Scan(&x.id, &x.thread, &x.sender, &x.senderName, &x.ts, &x.read, &x.starred, &x.subject, &x.body) == nil {
+		if rows.Scan(&x.id, &x.thread, &x.sender, &x.senderName, &x.senderEmail, &x.ts, &x.read, &x.starred, &x.subject, &x.body) == nil {
 			all = append(all, x)
 		}
 	}
@@ -257,7 +260,7 @@ func (a *app) mailList(w http.ResponseWriter, r *http.Request) {
 		l := g.latest
 		subject := a.mailOpen("subject", l.id, l.subject)
 		item := mailItem{
-			ID: l.id, ThreadID: l.thread, IDs: g.ids, From: mailPerson{ID: l.sender, Name: l.senderName}, To: names[l.id],
+			ID: l.id, ThreadID: l.thread, IDs: g.ids, From: mailPerson{ID: l.sender, Name: l.senderName, Email: l.senderEmail}, To: names[l.id],
 			Subject: subject, Snippet: snippet(a.mailOpen("body", l.id, bodies[l.id]), 140), Date: l.ts, Count: len(g.ids),
 			Unread: g.unread, Starred: g.starred, HasAttachments: attach[l.id], Draft: folder == "drafts",
 		}
@@ -295,6 +298,18 @@ func (a *app) mailRecipientNames(ctx context.Context, ids []int64, uid int64) ma
 			out[id] = append(out[id], n)
 		}
 	}
+	if er, err := a.st.db.Query(ctx, `
+		SELECT r.message_id, COALESCE(NULLIF(r.name,''), r.address) FROM mail_external_recipients r JOIN mail_messages m ON m.id=r.message_id
+		WHERE r.message_id = ANY($1) AND (r.kind <> 'bcc' OR m.sender_id=$2) ORDER BY r.message_id, r.address`, ids, uid); err == nil {
+		for er.Next() {
+			var id int64
+			var n string
+			if er.Scan(&id, &n) == nil {
+				out[id] = append(out[id], n)
+			}
+		}
+		er.Close()
+	}
 	return out
 }
 
@@ -326,11 +341,11 @@ func (a *app) mailThread(w http.ResponseWriter, r *http.Request) {
 	}
 	trash := r.URL.Query().Get("folder") == "trash"
 	rows, err := a.st.db.Query(ctx, `
-		SELECT m.id, m.parent_id, m.sender_id, su.display_name, m.subject, m.body, COALESCE(m.sent_at, m.updated_at), m.sent_at IS NULL,
+		SELECT m.id, m.parent_id, COALESCE(m.sender_id,0), COALESCE(su.display_name, NULLIF(m.external_name,''), m.external_address, ''), COALESCE(m.external_address,''), m.subject, m.body, COALESCE(m.sent_at, m.updated_at), m.sent_at IS NULL,
 		       NOT bool_and(b.is_read), bool_or(b.starred)
-		FROM mail_boxes b JOIN mail_messages m ON m.id=b.message_id JOIN users su ON su.id=m.sender_id
+		FROM mail_boxes b JOIN mail_messages m ON m.id=b.message_id LEFT JOIN users su ON su.id=m.sender_id
 		WHERE b.user_id=$1 AND NOT b.purged AND m.thread_id=$2 AND ((b.folder='trash') = $3)
-		GROUP BY m.id, su.display_name
+		GROUP BY m.id, su.display_name, m.external_name, m.external_address
 		ORDER BY COALESCE(m.sent_at, m.updated_at), m.id`, uid, thread, trash)
 	if err != nil {
 		apiError(w, 500, "internal error")
@@ -341,7 +356,7 @@ func (a *app) mailThread(w http.ResponseWriter, r *http.Request) {
 	for rows.Next() {
 		var m mailMessage
 		var subj, body []byte
-		if rows.Scan(&m.ID, &m.ParentID, &m.From.ID, &m.From.Name, &subj, &body, &m.Date, &m.Draft, &m.Unread, &m.Starred) == nil {
+		if rows.Scan(&m.ID, &m.ParentID, &m.From.ID, &m.From.Name, &m.From.Email, &subj, &body, &m.Date, &m.Draft, &m.Unread, &m.Starred) == nil {
 			m.Subject, m.Body = a.mailOpen("subject", m.ID, subj), a.mailOpen("body", m.ID, body)
 			m.Mine = m.From.ID == uid
 			m.To, m.Cc, m.Bcc, m.Attachments = []mailPerson{}, []mailPerson{}, []mailPerson{}, []mailAttachment{}
@@ -379,6 +394,27 @@ func (a *app) mailThread(w http.ResponseWriter, r *http.Request) {
 		}
 		rr.Close()
 	}
+	if er, err := a.st.db.Query(ctx, `
+		SELECT r.message_id, COALESCE(NULLIF(r.name,''), r.address), r.address, r.kind FROM mail_external_recipients r JOIN mail_messages m ON m.id=r.message_id
+		WHERE r.message_id = ANY($1) AND (r.kind <> 'bcc' OR m.sender_id=$2) ORDER BY r.address`, ids, uid); err == nil {
+		for er.Next() {
+			var id int64
+			var p mailPerson
+			var kind string
+			if er.Scan(&id, &p.Name, &p.Email, &kind) == nil {
+				m := idx[id]
+				switch kind {
+				case "to":
+					m.To = append(m.To, p)
+				case "cc":
+					m.Cc = append(m.Cc, p)
+				default:
+					m.Bcc = append(m.Bcc, p)
+				}
+			}
+		}
+		er.Close()
+	}
 	if ar, err := a.st.db.Query(ctx, `SELECT message_id, id::text, filename, mime, size FROM mail_attachments WHERE message_id = ANY($1) ORDER BY created_at`, ids); err == nil {
 		for ar.Next() {
 			var id int64
@@ -399,6 +435,9 @@ type mailDraftReq struct {
 	To            []int64  `json:"to"`
 	Cc            []int64  `json:"cc"`
 	Bcc           []int64  `json:"bcc"`
+	ToExt         []string `json:"to_ext"`
+	CcExt         []string `json:"cc_ext"`
+	BccExt        []string `json:"bcc_ext"`
 	Subject       string   `json:"subject"`
 	Body          string   `json:"body"`
 	ParentID      *int64   `json:"parent_id"`
@@ -440,7 +479,14 @@ func (a *app) saveDraft(ctx context.Context, uid int64, req mailDraftReq) (int64
 			}
 		}
 	}
-	if len(kinds) > mailMaxRecipients {
+	exts, err := a.resolveExternal(ctx, req, kinds)
+	if err != nil {
+		return 0, nil, err
+	}
+	if len(exts) > 0 && !mailCfg.outbound() {
+		return 0, nil, bad("sending to external addresses is not configured on this server")
+	}
+	if len(kinds)+len(exts) > mailMaxRecipients {
 		return 0, nil, bad("too many recipients (max 50)")
 	}
 	tx, err := a.st.db.Begin(ctx)
@@ -513,6 +559,14 @@ func (a *app) saveDraft(ctx context.Context, uid int64, req mailDraftReq) (int64
 	}
 	for u, k := range kinds {
 		if _, err := tx.Exec(ctx, `INSERT INTO mail_recipients(message_id, user_id, kind) VALUES ($1,$2,$3)`, id, u, k); err != nil {
+			return 0, nil, err
+		}
+	}
+	if _, err := tx.Exec(ctx, `DELETE FROM mail_external_recipients WHERE message_id=$1`, id); err != nil {
+		return 0, nil, err
+	}
+	for _, e := range exts {
+		if _, err := tx.Exec(ctx, `INSERT INTO mail_external_recipients(message_id, address, name, kind) VALUES ($1,$2,NULLIF($3,''),$4)`, id, e.address, e.name, e.kind); err != nil {
 			return 0, nil, err
 		}
 	}
@@ -627,8 +681,15 @@ func (a *app) sendDraft(ctx context.Context, uid int64, id int64) (int64, []int6
 		}
 	}
 	rows.Close()
-	if len(rcpt) == 0 {
+	var external int
+	if err := tx.QueryRow(ctx, `SELECT COUNT(*) FROM mail_external_recipients WHERE message_id=$1`, id).Scan(&external); err != nil {
+		return 0, nil, err
+	}
+	if len(rcpt)+external == 0 {
 		return 0, nil, bad("add at least one recipient")
+	}
+	if external > 0 && !mailCfg.outbound() {
+		return 0, nil, bad("sending to external addresses is not configured on this server")
 	}
 	var n int
 	if err := tx.QueryRow(ctx, `SELECT COUNT(*) FROM users WHERE active AND id = ANY($1)`, rcpt).Scan(&n); err != nil || n != len(rcpt) {
@@ -642,6 +703,11 @@ func (a *app) sendDraft(ctx context.Context, uid int64, id int64) (int64, []int6
 	}
 	for _, u := range rcpt {
 		if _, err := tx.Exec(ctx, `INSERT INTO mail_boxes(message_id, user_id, role, folder, is_read) VALUES ($1,$2,'recipient','inbox',FALSE)`, id, u); err != nil {
+			return 0, nil, err
+		}
+	}
+	if external > 0 {
+		if _, err := tx.Exec(ctx, `INSERT INTO mail_outbox(message_id) VALUES ($1)`, id); err != nil {
 			return 0, nil, err
 		}
 	}

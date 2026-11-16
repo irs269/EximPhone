@@ -25,7 +25,7 @@ function Attachment({ a }: { a: MailAttachment }) {
 
 function MessageCard({ m, open, toggle }: { m: MailMessage; open: boolean; toggle: () => void }) {
   const { reply, forward, compose } = useMail();
-  const names = (ps: { name: string }[]) => ps.map((p) => p.name).join(', ');
+  const names = (ps: { name: string; email?: string; id: number }[]) => ps.map((p) => (p.id === 0 && p.email && p.email !== p.name ? `${p.name} <${p.email}>` : p.name)).join(', ');
   return (
     <article className={'mailmsg' + (open ? ' open' : '')}>
       <header onClick={toggle} role="button" tabIndex={0} aria-expanded={open} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); } }}>
@@ -36,7 +36,7 @@ function MessageCard({ m, open, toggle }: { m: MailMessage; open: boolean; toggl
       {open && (
         <div className="mbody">
           <div className="hdrs">
-            <span>{t('mail.from')}</span><b>{m.from.name}</b>
+            <span>{t('mail.from')}</span><b>{m.from.name}{m.from.email && m.from.id === 0 ? ` <${m.from.email}>` : ''}{m.from.id === 0 && <span className="tkp off" style={{ marginLeft: 8 }}>{t('mail.external')}</span>}</b>
             {m.to.length > 0 && <><span>{t('mail.to')}</span><b>{names(m.to)}</b></>}
             {m.cc.length > 0 && <><span>{t('mail.cc')}</span><b>{names(m.cc)}</b></>}
             {m.bcc.length > 0 && <><span>{t('mail.bcc')}</span><b>{names(m.bcc)}</b></>}
@@ -50,7 +50,7 @@ function MessageCard({ m, open, toggle }: { m: MailMessage; open: boolean; toggl
               <button className="btn ghost" onClick={() => forward(m)}>{t('mail.forward')}</button>
             </div>
           )}
-          {m.draft && <div className="acts"><button className="btn" onClick={() => { compose({ id: m.id, to: m.to.map((p) => p.id), cc: m.cc.map((p) => p.id), bcc: m.bcc.map((p) => p.id), subject: m.subject, body: m.body, parent_id: m.parent_id ?? undefined, attachments: m.attachments, showCc: m.cc.length > 0, showBcc: m.bcc.length > 0 }); }}>{t('mail.edit')}</button></div>}
+          {m.draft && <div className="acts"><button className="btn" onClick={() => { compose({ id: m.id, to: m.to.filter((p) => p.id > 0).map((p) => p.id), cc: m.cc.filter((p) => p.id > 0).map((p) => p.id), bcc: m.bcc.filter((p) => p.id > 0).map((p) => p.id), to_ext: m.to.filter((p) => p.id === 0 && p.email).map((p) => p.email as string), cc_ext: m.cc.filter((p) => p.id === 0 && p.email).map((p) => p.email as string), bcc_ext: m.bcc.filter((p) => p.id === 0 && p.email).map((p) => p.email as string), subject: m.subject, body: m.body, parent_id: m.parent_id ?? undefined, attachments: m.attachments, showCc: m.cc.length > 0, showBcc: m.bcc.length > 0 }); }}>{t('mail.edit')}</button></div>}
         </div>
       )}
     </article>

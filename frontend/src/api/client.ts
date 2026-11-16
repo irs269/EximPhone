@@ -204,7 +204,7 @@ export const commentTicket = (id: number, comment: string) => post<{ ok: boolean
 
 // ---- mail ----
 export type MailFolder = 'inbox' | 'starred' | 'sent' | 'drafts' | 'archive' | 'trash';
-export interface MailPerson { id: number; name: string }
+export interface MailPerson { id: number; name: string; email?: string } // id 0 = outside the platform
 export interface MailAttachment { id: string; filename: string; mime: string; size: number }
 export interface MailItem {
   id: number; thread_id: number; ids: number[]; from: MailPerson; to: string[]; subject: string; snippet: string; date: string;
@@ -215,9 +215,9 @@ export interface MailMessage {
   subject: string; body: string; date: string; unread: boolean; starred: boolean; draft: boolean; mine: boolean; attachments: MailAttachment[];
 }
 export interface MailThread { thread_id: number; subject: string; messages: MailMessage[] }
-export interface MailCounts { unread_inbox: number; drafts: number; starred: number }
+export interface MailCounts { unread_inbox: number; drafts: number; starred: number; external?: boolean }
 export interface MailDraft {
-  id?: number; to: number[]; cc: number[]; bcc: number[]; subject: string; body: string;
+  id?: number; to: number[]; cc: number[]; bcc: number[]; to_ext: string[]; cc_ext: string[]; bcc_ext: string[]; subject: string; body: string;
   parent_id?: number; forward_of?: number; attachment_ids: string[];
 }
 export type MailAction = 'read' | 'unread' | 'star' | 'unstar' | 'archive' | 'trash' | 'restore' | 'purge';

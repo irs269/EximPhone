@@ -135,6 +135,7 @@ export const fr = {
   'mail.wrote': 'Le {date}, {name} a écrit :', 'mail.fwdHeader': '---------- Message transféré ----------', 'mail.count': '{n} messages',
   'mail.err.noRecipient': 'Ajoutez au moins un destinataire.', 'mail.err.generic': "L'envoi a échoué. Vérifiez les destinataires et les pièces jointes.",
   'mail.err.upload': 'Fichier refusé : exécutables et scripts interdits, 20 Mo maximum.',
+  'mail.err.external': "L'envoi vers des adresses externes n'est pas configuré sur ce serveur.", 'mail.addAddress': 'Ajouter {address}', 'mail.external': 'Externe',
   'toast.status': 'Statut : {s}',
 } as const;
 export type Key = keyof typeof fr;

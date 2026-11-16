@@ -4,6 +4,8 @@ go 1.23
 
 require (
 	github.com/coder/websocket v1.8.12
+	github.com/emersion/go-imap v1.2.1
+	github.com/emersion/go-message v0.18.1
 	github.com/emiago/sipgo v0.27.0
 	github.com/go-chi/chi/v5 v5.1.0
 	github.com/go-ldap/ldap/v3 v3.4.8
@@ -24,6 +26,7 @@ require (
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
 	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
+	github.com/emersion/go-sasl v0.0.0-20200509203442-7bfe0ed36a21 // indirect
 	github.com/go-asn1-ber/asn1-ber v1.5.5 // indirect
 	github.com/go-ini/ini v1.67.0 // indirect
 	github.com/gobwas/httphead v0.1.0 // indirect

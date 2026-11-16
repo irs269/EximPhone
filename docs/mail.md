@@ -1,7 +1,7 @@
 # Internal mail
 
 Mail between the employees of the platform, hosted on the bank's own servers. It works like a mailbox (folders, drafts, conversations,
-attachments, search) but stays inside the platform: **it does not send to or receive from the Internet yet** (see "Next: external mail").
+attachments, search) but stays inside the platform: it can also **send to and receive from external addresses** through the bank's existing mail server (see "External mail"; optional).
 
 ## Features
 
@@ -44,12 +44,49 @@ attachments, search) but stays inside the platform: **it does not send to or rec
 
 Tested end to end by `tests/e2e/mail.mjs` (54 checks: delivery, Bcc privacy, conversations, folders, drafts, attachments, forwarding, search, access control, pagination).
 
-## Next: external mail (not built)
+## External mail (through the bank's mail server)
 
-Sending to and receiving from outside the platform needs the bank's existing mail server. The planned design keeps this module as is and adds a connector:
+Optional. Without the settings below, the platform stays internal and refuses external addresses. With them:
 
-1. **Outgoing**: an SMTP relay on the existing server (`MAIL_SMTP_*` settings), used when a recipient is an external address.
-2. **Incoming**: reading the mailboxes of the employees over IMAP (service account or per-user) and storing the messages in the same tables.
-3. Mapping between directory users and their e-mail addresses (the directory already provides `mail`).
+- **Outgoing**: type any e-mail address in To, Cc or Bcc. Messages with external recipients are queued (`mail_outbox`) and handed to an **SMTP relay**.
+  The message is a standard MIME message (UTF-8, attachments, `Message-ID`, `In-Reply-To`); Bcc recipients are in the SMTP envelope only.
+  Retries: 1 min, 5 min, 30 min, 2 h, 6 h; a permanent refusal (5xx) or the last failure tells the sender with a "Delivery failure" message in the inbox.
+  An address that belongs to a platform user is delivered **internally** (no relay).
+- **Incoming**: an **IMAP mailbox** is polled (every 30 s by default). Each unread message is filed in the inbox of the platform users it is addressed to (matched by their directory e-mail
+  in To, Cc, `Delivered-To`, `X-Original-To`...), with its attachments; HTML-only mail is converted to plain text (no script, no tracking pixel); duplicates (same `Message-ID`) are ignored;
+  messages for nobody on the platform are skipped; replies are threaded with `In-Reply-To` and `References`. Executables and scripts are dropped from attachments.
+- External senders are shown with their address and an "External" badge; replying to one goes through the relay.
 
-It needs from the bank: the server type and host, the ports and security (TLS), and an account allowed to relay. Other open items: rich text (HTML) composition, custom folders and labels, signatures, out-of-office replies, calendar invitations, shared mailboxes.
+### Settings (environment of the `api` service)
+
+| Variable | Meaning | Default |
+|---|---|---|
+| `MAIL_SMTP_HOST`, `MAIL_SMTP_PORT` | SMTP relay (enables outgoing) | port by security |
+| `MAIL_SMTP_SECURITY` | `starttls`, `tls` or `none` | `starttls` (587) |
+| `MAIL_SMTP_USER`, `MAIL_SMTP_PASSWORD` | relay account (PLAIN auth, only over TLS) | none |
+| `MAIL_FROM_MODE` | `user`: From = the user's directory e-mail; `fixed`: From = `MAIL_FROM_ADDRESS`, Reply-To = the user | `user` |
+| `MAIL_FROM_ADDRESS` | address used in `fixed` mode (or when a user has no e-mail) | none |
+| `MAIL_DOMAIN` | domain used in generated `Message-ID` | `exim.local` |
+| `MAIL_CA_FILE` | PEM file of the bank's internal CA, to verify the servers' certificates | system roots |
+| `MAIL_IMAP_HOST`, `MAIL_IMAP_PORT` | IMAP server (enables incoming) | port by security |
+| `MAIL_IMAP_SECURITY` | `tls` (993), `starttls` (143) or `none` | `tls` |
+| `MAIL_IMAP_USER`, `MAIL_IMAP_PASSWORD`, `MAIL_IMAP_FOLDER` | the polled mailbox | folder `INBOX` |
+| `MAIL_POLL_SECONDS` | polling interval | 30 |
+
+### What the mail server must provide
+
+1. **An SMTP relay** that accepts the platform: its address, port, TLS mode and an account allowed to send. In `user` mode that account must be allowed to send as each employee
+   (Exchange "Send As", or a relay by source IP); otherwise use `fixed` mode.
+2. **One mailbox for incoming mail**, filled by a rule on the mail server: *forward or Bcc* the mail of the employees who use Exim Connect to that mailbox (a transport rule or alias).
+   The platform files each message by the recipients named in the headers. Only one account and password are stored on the platform.
+3. The directory (`mail` attribute) must hold each employee's address: the platform uses it to match incoming mail and to build the From of outgoing mail.
+4. SPF/DKIM/DMARC: the relay signs and sends as usual; if `From` addresses differ from the relay's domain, allow the platform server in the domain's SPF.
+
+### Testing
+
+The dev stack includes **GreenMail** (SMTP 3025, IMAP 3143 on localhost, plain) wired to the api by `docker-compose.dev.yml`.
+`tests/e2e/mail-external.mjs` (22 checks) relays real messages through it and injects incoming ones: MIME, Bcc privacy, UTF-8, attachments, duplicates, HTML, unknown recipients, threading.
+
+### Not built
+
+Per-user IMAP mailboxes (the design uses one service mailbox), rich text composition, custom folders and labels, signatures, out-of-office replies, calendar invitations, shared mailboxes, spam filtering (left to the mail server).

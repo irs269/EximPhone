@@ -138,5 +138,6 @@ export const en: Record<Key, string> = {
   'mail.wrote': 'On {date}, {name} wrote:', 'mail.fwdHeader': '---------- Forwarded message ----------', 'mail.count': '{n} messages',
   'mail.err.noRecipient': 'Add at least one recipient.', 'mail.err.generic': 'Sending failed. Check the recipients and the attachments.',
   'mail.err.upload': 'File refused: executables and scripts are not allowed, 20 MB maximum.',
+  'mail.err.external': 'Sending to external addresses is not configured on this server.', 'mail.addAddress': 'Add {address}', 'mail.external': 'External',
   'toast.status': 'Status: {s}',
 };

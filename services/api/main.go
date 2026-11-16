@@ -91,5 +91,8 @@ func main() {
 			BindDN: env("LDAP_BIND_DN"), BindPassword: env("LDAP_BIND_PASSWORD"),
 		},
 	}
-	server.RunWith("api", a.routes, func(ctx context.Context, _ *slog.Logger) { a.hub.run(ctx) })
+	server.RunWith("api", a.routes, func(ctx context.Context, log *slog.Logger) {
+		a.startMailExternal(ctx, log)
+		a.hub.run(ctx)
+	})
 }
