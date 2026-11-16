@@ -201,3 +201,48 @@ export const startTicket = (id: number) => post<Ticket>(`/tickets/${id}/start`);
 export const resolveTicket = (id: number, comment: string) => post<Ticket>(`/tickets/${id}/resolve`, { comment });
 export const cancelTicket = (id: number) => post<Ticket>(`/tickets/${id}/cancel`);
 export const commentTicket = (id: number, comment: string) => post<{ ok: boolean }>(`/tickets/${id}/comments`, { comment });
+
+// ---- mail ----
+export type MailFolder = 'inbox' | 'starred' | 'sent' | 'drafts' | 'archive' | 'trash';
+export interface MailPerson { id: number; name: string }
+export interface MailAttachment { id: string; filename: string; mime: string; size: number }
+export interface MailItem {
+  id: number; thread_id: number; ids: number[]; from: MailPerson; to: string[]; subject: string; snippet: string; date: string;
+  count: number; unread: boolean; starred: boolean; has_attachments: boolean; draft: boolean;
+}
+export interface MailMessage {
+  id: number; parent_id: number | null; from: MailPerson; to: MailPerson[]; cc: MailPerson[]; bcc: MailPerson[];
+  subject: string; body: string; date: string; unread: boolean; starred: boolean; draft: boolean; mine: boolean; attachments: MailAttachment[];
+}
+export interface MailThread { thread_id: number; subject: string; messages: MailMessage[] }
+export interface MailCounts { unread_inbox: number; drafts: number; starred: number }
+export interface MailDraft {
+  id?: number; to: number[]; cc: number[]; bcc: number[]; subject: string; body: string;
+  parent_id?: number; forward_of?: number; attachment_ids: string[];
+}
+export type MailAction = 'read' | 'unread' | 'star' | 'unstar' | 'archive' | 'trash' | 'restore' | 'purge';
+
+export const mailFolders = () => request<MailCounts>('/mail/folders');
+export const mailList = (folder: MailFolder, q: string, page: number) =>
+  request<{ items: MailItem[]; more: boolean }>(`/mail/messages?folder=${folder}&q=${encodeURIComponent(q)}&page=${page}`);
+export const mailThread = (id: number, folder?: MailFolder) => request<MailThread>(`/mail/threads/${id}${folder === 'trash' ? '?folder=trash' : ''}`);
+export const mailSaveDraft = (d: MailDraft) => post<{ id: number; attachments: MailAttachment[] }>('/mail/drafts', d);
+export const mailSend = (d: MailDraft) => post<{ id: number; thread_id: number }>('/mail/send', d);
+export const mailDiscard = (id: number) => request<unknown>(`/mail/drafts/${id}`, { method: 'DELETE' });
+export const mailBatch = (ids: number[], action: MailAction) => post<{ updated: number }>('/mail/batch', { ids, action });
+
+export async function mailUpload(file: File): Promise<MailAttachment> {
+  const form = new FormData();
+  form.append('file', file);
+  const res = await fetch('/api/mail/attachments', { method: 'POST', body: form, headers: { Authorization: `Bearer ${token}` }, credentials: 'same-origin' });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new ApiError(res.status, body.error ?? 'upload failed');
+  return body as MailAttachment;
+}
+
+/** Downloads a mail attachment (auth header required, so we go through fetch) and returns an object URL. */
+export async function mailAttachmentUrl(id: string): Promise<string> {
+  const res = await fetch('/api/mail/attachments/' + id, { headers: { Authorization: `Bearer ${token}` }, credentials: 'same-origin' });
+  if (!res.ok) throw new ApiError(res.status, 'download failed');
+  return URL.createObjectURL(await res.blob());
+}

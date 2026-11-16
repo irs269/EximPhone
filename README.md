@@ -48,3 +48,5 @@ Phase 5 (desk phones) done: see [docs/provisioning.md](docs/provisioning.md). SI
 Phase 6 (announcements, HR, RBAC, audit) done: see [docs/hr-admin.md](docs/hr-admin.md). Announcements with targeting and read receipts (urgent pop-up), real-time HR/manager dashboard, early-departure validation, justified corrections, monthly CSV/Excel export, role management, site rules, append-only audit viewer. Verified by `tests/e2e/hr.mjs` (36 checks). There is no admin screen yet for roles and sites (API only), and no public holiday calendar.
 
 Service tickets (file for a service, head approves or rejects, then assigns to a member): see [docs/tickets.md](docs/tickets.md). English and French UI with a language switch; Help view with IT contacts and FAQ.
+
+Internal mail (compose with To/Cc/Bcc, drafts, conversations, attachments, folders, search): see [docs/mail.md](docs/mail.md). External mail through the existing mail server is the planned next step.

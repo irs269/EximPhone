@@ -18,6 +18,10 @@ import { Phone } from '../views/Phone';
 import { Directory } from '../views/Directory';
 import { Help, faqIds } from '../views/Help';
 import { Tickets, StatusPill } from '../views/Tickets';
+import { Mail, mailDate } from '../views/Mail';
+import { MailComposer } from './MailComposer';
+import { useMail } from '../store/mail';
+import type { MailFolder } from '../api/client';
 import { NewTicketDialog } from './NewTicketDialog';
 import { useTickets } from '../store/tickets';
 import type { TicketView } from '../api/client';
@@ -29,6 +33,7 @@ import { Dialogs } from './Dialogs';
 
 const nav: { v: View; icon: IconName; label: Parameters<typeof t>[0] }[] = [
   { v: 'chat', icon: 'chat', label: 'nav.messages' },
+  { v: 'mail', icon: 'mail', label: 'nav.mail' },
   { v: 'phone', icon: 'phone', label: 'nav.calls' },
   { v: 'dir', icon: 'dir', label: 'nav.directory' },
   { v: 'att', icon: 'clock', label: 'nav.attendance' },
@@ -46,7 +51,8 @@ function Rail() {
   const unread = useChat((c) => c.convs.reduce((n, x) => n + x.unread, 0));
   const pendingAnn = useAnn((a) => a.items.filter((x) => !x.acked_at).length);
   const waitingTickets = useTickets((tk) => tk.summary.waiting);
-  const badge = (v: View) => (v === 'chat' ? unread : v === 'ann' ? pendingAnn : v === 'tickets' ? waitingTickets : 0);
+  const unreadMail = useMail((m) => m.counts.unread_inbox);
+  const badge = (v: View) => (v === 'chat' ? unread : v === 'ann' ? pendingAnn : v === 'tickets' ? waitingTickets : v === 'mail' ? unreadMail : 0);
   return (
     <nav className="rail" aria-label={t('nav.main')}>
       <div className="mono" title="Exim Bank" role="img" aria-label="Exim Bank" />
@@ -92,7 +98,7 @@ function StatusMenu() {
 function ListPane() {
   const s = useApp();
   const q = s.query.toLowerCase();
-  const titles: Record<View, Parameters<typeof t>[0]> = { chat: 'nav.messages', phone: 'nav.calls', dir: 'nav.directory', att: 'nav.attendance', ann: 'nav.announcements', tickets: 'nav.tickets', team: 'nav.team', audit: 'nav.audit', help: 'nav.help' };
+  const titles: Record<View, Parameters<typeof t>[0]> = { chat: 'nav.messages', mail: 'nav.mail', phone: 'nav.calls', dir: 'nav.directory', att: 'nav.attendance', ann: 'nav.announcements', tickets: 'nav.tickets', team: 'nav.team', audit: 'nav.audit', help: 'nav.help' };
   const annItems = useAnn((a) => a.items);
   const chat = useChat();
   const calls = useCalls();
@@ -103,6 +109,13 @@ function ListPane() {
     return () => window.clearTimeout(id);
   }, [q, s.view]);
   const tk = useTickets();
+  const mail = useMail();
+  useEffect(() => { if (s.view === 'mail') { void mail.loadList(); void mail.loadCounts(); } }, [s.view]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (s.view !== 'mail' || s.query === mail.q) return;
+    const id = window.setTimeout(() => mail.setQuery(s.query), 300);
+    return () => window.clearTimeout(id);
+  }, [s.query, s.view]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { if (s.view === 'tickets') { void tk.loadList(); void tk.loadSummary(); } }, [s.view]); // eslint-disable-line react-hooks/exhaustive-deps
   const days = useQuery({ queryKey: ['history'], queryFn: history, enabled: s.view === 'att' });
   let items: React.ReactNode[] = [];
@@ -160,6 +173,28 @@ function ListPane() {
     ));
   } else if (s.view === 'team' || s.view === 'audit') {
     items = [];
+  } else if (s.view === 'mail') {
+    const folders: MailFolder[] = ['inbox', 'starred', 'sent', 'drafts', 'archive', 'trash'];
+    const counter = (f: MailFolder) => (f === 'inbox' && mail.counts.unread_inbox > 0 ? ` (${mail.counts.unread_inbox})` : f === 'drafts' && mail.counts.drafts > 0 ? ` (${mail.counts.drafts})` : '');
+    const outgoing = mail.folder === 'sent' || mail.folder === 'drafts';
+    items = [
+      <button key="new" className="btn gold newbtn" onClick={() => mail.compose()}>+ {t('mail.new')}</button>,
+      <div className="tkf" key="f" role="group">
+        {folders.map((f) => <button key={f} className={mail.folder === f ? 'on' : ''} aria-pressed={mail.folder === f} onClick={() => mail.setFolder(f)}>{t(`mail.folder.${f}`)}{counter(f)}</button>)}
+      </div>,
+      ...mail.items.map((i) => (
+        <button key={i.thread_id + '-' + i.id} className={'it mailit' + (mail.thread?.thread_id === i.thread_id ? ' on' : '') + (i.unread ? ' unread' : '')} onClick={() => void mail.open(i)}>
+          <div className="t">
+            <div className="n"><span className="from">{outgoing ? t('mail.toLine', { names: i.to.join(', ') || '—' }) : i.from.name}{i.count > 1 && <small> ({i.count})</small>}</span><small>{mailDate(i.date)}</small></div>
+            <div className="s subj">{i.subject || t('mail.noSubject')}</div>
+            <div className="s">{i.snippet}</div>
+          </div>
+          <span className="flags">{i.starred && <span className="star" aria-hidden>★</span>}{i.has_attachments && <Icon name="clip" size={13} />}{i.unread && <span className="dotu" aria-hidden />}</span>
+        </button>
+      )),
+      ...(mail.items.length === 0 ? [<div className="sec" key="none" style={{ color: 'var(--muted)' }}>{t('mail.none')}</div>] : []),
+      ...(mail.more ? [<button key="more" className="btn ghost newbtn" onClick={() => void mail.loadMore()}>{t('mail.more')}</button>] : []),
+    ];
   } else if (s.view === 'tickets') {
     const filters: [TicketView, Parameters<typeof t>[0]][] = [['', 'tk.filter.all'], ['mine', 'tk.filter.mine'], ['todo', 'tk.filter.todo'], ...(tk.summary.is_head ? [['service', 'tk.filter.service'] as [TicketView, Parameters<typeof t>[0]]] : [])];
     items = [
@@ -230,12 +265,14 @@ export function Shell() {
           {view === 'audit' && <Audit />}
           {view === 'help' && <Help />}
           {view === 'tickets' && <Tickets />}
+          {view === 'mail' && <Mail />}
         </main>
       </div>
       <StatusMenu />
       <CallOverlay />
       <NewChatDialog />
       <NewTicketDialog />
+      <MailComposer />
       <UrgentDialog />
       <Dialogs />
       <div id="toast" className={toast ? 'show' : ''} role="status" aria-live="polite">{toast}</div>

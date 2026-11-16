@@ -123,6 +123,18 @@ export const fr = {
   'tk.toast.created': 'Nouveau ticket : {title}', 'tk.toast.approved': 'Ticket approuvé : {title}', 'tk.toast.rejected': 'Ticket refusé : {title}',
   'tk.toast.assigned': 'Ticket assigné : {title}', 'tk.toast.started': 'Ticket pris en charge : {title}', 'tk.toast.resolved': 'Ticket résolu : {title}',
   'tk.toast.cancelled': 'Ticket annulé : {title}', 'tk.toast.comment': 'Nouveau commentaire : {title}',
+  'nav.mail': 'Courrier',
+  'mail.new': 'Nouveau message', 'mail.empty': 'Sélectionnez un message ou écrivez-en un nouveau.', 'mail.none': 'Aucun message.', 'mail.more': 'Afficher plus',
+  'mail.folder.inbox': 'Réception', 'mail.folder.starred': 'Suivis', 'mail.folder.sent': 'Envoyés', 'mail.folder.drafts': 'Brouillons', 'mail.folder.archive': 'Archives', 'mail.folder.trash': 'Corbeille',
+  'mail.from': 'De', 'mail.to': 'À', 'mail.cc': 'Cc', 'mail.bcc': 'Cci', 'mail.subject': 'Objet', 'mail.noSubject': '(sans objet)', 'mail.me': 'moi', 'mail.toLine': 'À : {names}',
+  'mail.body': 'Message', 'mail.send': 'Envoyer', 'mail.saveDraft': 'Enregistrer le brouillon', 'mail.discard': 'Supprimer le brouillon', 'mail.close': 'Fermer',
+  'mail.attach': 'Joindre un fichier', 'mail.removeAttachment': 'Retirer', 'mail.addRecipient': 'Ajouter un destinataire…', 'mail.attachments': 'Pièces jointes',
+  'mail.reply': 'Répondre', 'mail.replyAll': 'Répondre à tous', 'mail.forward': 'Transférer', 'mail.archive': 'Archiver', 'mail.delete': 'Supprimer',
+  'mail.restore': 'Restaurer', 'mail.purge': 'Supprimer définitivement', 'mail.star': 'Suivre', 'mail.unstar': 'Ne plus suivre', 'mail.markUnread': 'Marquer comme non lu',
+  'mail.sent': 'Message envoyé', 'mail.draftSaved': 'Brouillon enregistré', 'mail.incoming': 'Nouveau message de {name}', 'mail.draftBadge': 'Brouillon', 'mail.edit': 'Modifier',
+  'mail.wrote': 'Le {date}, {name} a écrit :', 'mail.fwdHeader': '---------- Message transféré ----------', 'mail.count': '{n} messages',
+  'mail.err.noRecipient': 'Ajoutez au moins un destinataire.', 'mail.err.generic': "L'envoi a échoué. Vérifiez les destinataires et les pièces jointes.",
+  'mail.err.upload': 'Fichier refusé : exécutables et scripts interdits, 20 Mo maximum.',
   'toast.status': 'Statut : {s}',
 } as const;
 export type Key = keyof typeof fr;

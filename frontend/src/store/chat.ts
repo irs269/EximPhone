@@ -4,6 +4,7 @@ import type { Conversation, DirUser, Message } from '../api/client';
 import { useCalls } from './calls';
 import { useAnn } from './ann';
 import { useTickets } from './tickets';
+import { useMail } from './mail';
 import { connectSocket, disconnectSocket, sendSocket, type ServerEvent } from '../api/socket';
 
 interface ChatState {
@@ -100,6 +101,9 @@ export const useChat = create<ChatState>((set, get) => {
         break;
       case 'ticket':
         useTickets.getState().onEvent(data, s.me);
+        break;
+      case 'mail':
+        useMail.getState().onEvent(data);
         break;
       case 'typing':
         if (data.user_id === s.me) break;
