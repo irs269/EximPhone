@@ -195,7 +195,7 @@ The application runs as **containers** on a Linux server:
 | **sip** | telephony, IP phones |
 | **turn** | network traversal for calls |
 | **provisioning** | automatic configuration of IP phones |
-| **worker** | scheduled tasks (closing days, incoming mail, backups) |
+| **worker** | scheduled tasks (closing forgotten days, directory sync, recording retention) |
 | **PostgreSQL / Redis** | data and real time |
 | **Object storage** | encrypted attachments and recordings |
 | **Directory** | the bank's Active Directory / LDAP |

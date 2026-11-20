@@ -195,7 +195,7 @@ L'application s'exécute sous forme de **conteneurs** sur un serveur Linux :
 | **sip** | téléphonie, téléphones IP |
 | **turn** | traversée de réseau pour les appels |
 | **provisioning** | configuration automatique des téléphones IP |
-| **worker** | tâches planifiées (clôture des journées, courrier entrant, sauvegardes) |
+| **worker** | tâches planifiées (clôture des journées oubliées, synchronisation de l'annuaire, durée de conservation des enregistrements) |
 | **PostgreSQL / Redis** | données et temps réel |
 | **Stockage objet** | pièces jointes et enregistrements chiffrés |
 | **Annuaire** | Active Directory / LDAP de la banque |

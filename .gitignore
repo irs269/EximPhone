@@ -11,3 +11,5 @@ downloads/*
 
 # generated documentation PDFs (python scripts/build-docs.py)
 docs/pdf/
+
+scripts/.cache/

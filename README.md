@@ -59,6 +59,7 @@ Video meetings (up to 12 people), video calls and screen sharing through an SFU 
 |---|---|---|
 | User manual (with screenshots) | [docs/fr/manuel-utilisateur.md](docs/fr/manuel-utilisateur.md) | [docs/en/user-manual.md](docs/en/user-manual.md) |
 | Features (management, IT) | [docs/fr/fonctionnalites.md](docs/fr/fonctionnalites.md) | [docs/en/features.md](docs/en/features.md) |
+| Technical guide (technologies, diagrams, Git workflow, CI/CD) | [docs/fr/guide-technique.md](docs/fr/guide-technique.md) | [docs/en/technical-guide.md](docs/en/technical-guide.md) |
 | Roadmap and what is needed to send external e-mail | [docs/fr/feuille-de-route.md](docs/fr/feuille-de-route.md) | [docs/en/roadmap.md](docs/en/roadmap.md) |
 
-The PDFs (`docs/pdf/fr`, `docs/pdf/en`, not versioned) are generated with `pip install markdown` then `python scripts/build-docs.py` (Edge or Chrome required). The screenshots (`docs/img` in French, `docs/img-en` in English) come from a clean demonstration environment.
+The PDFs (`docs/pdf/fr`, `docs/pdf/en`, not versioned; the diagrams are Mermaid, drawn by GitHub and by the PDF build) are generated with `pip install markdown` then `python scripts/build-docs.py` (Edge or Chrome required). The screenshots (`docs/img` in French, `docs/img-en` in English) come from a clean demonstration environment.

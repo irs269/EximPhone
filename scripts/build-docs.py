@@ -8,6 +8,7 @@ Needs: pip install markdown, and Microsoft Edge or Chrome (used to print the PDF
 The Markdown files stay the source of truth; the screenshots live in docs/img (French UI) and docs/img-en (English UI).
 """
 import html
+import re
 import shutil
 import subprocess
 import sys
@@ -18,6 +19,8 @@ import markdown
 
 ROOT = Path(__file__).resolve().parent.parent
 LOGO = ROOT / "brand" / "logo-white.svg"
+MERMAID_VERSION = "10.9.2"
+MERMAID = ROOT / "scripts" / ".cache" / "mermaid.min.js"  # downloaded once, not versioned
 
 LANGS = {
     "fr": {
@@ -28,11 +31,12 @@ LANGS = {
         "platform": "Plateforme de communication interne d'Exim Bank",
         "toc": "Sommaire",
         "all_title": "Exim Connect : documentation complète",
-        "all_sub": "Fonctionnalités, manuel d'utilisation et feuille de route",
+        "all_sub": "Fonctionnalités, manuel, guide technique et feuille de route",
         "all_file": "Exim-Connect-Documentation-complete",
         "docs": [
             ("manuel-utilisateur", "Manuel d'utilisation", "Guide pas à pas pour les collaborateurs", "Manuel-utilisateur"),
             ("fonctionnalites", "Fonctionnalités", "Présentation pour la direction, la DSI et les équipes métier", "Fonctionnalites"),
+            ("guide-technique", "Guide technique", "Technologies, architecture, schémas, qualité et workflow Git", "Guide-technique"),
             ("feuille-de-route", "Feuille de route", "Mise en production, évolutions et envoi de courriels externes", "Feuille-de-route"),
         ],
     },
@@ -44,11 +48,12 @@ LANGS = {
         "platform": "Exim Bank's internal communication platform",
         "toc": "Contents",
         "all_title": "Exim Connect: complete documentation",
-        "all_sub": "Features, user manual and roadmap",
+        "all_sub": "Features, user manual, technical guide and roadmap",
         "all_file": "Exim-Connect-Complete-documentation",
         "docs": [
             ("user-manual", "User Manual", "Step-by-step guide for employees", "User-manual"),
             ("features", "Features", "Overview for management, IT and business teams", "Features"),
+            ("technical-guide", "Technical Guide", "Technologies, architecture, diagrams, quality and Git workflow", "Technical-guide"),
             ("roadmap", "Roadmap", "Going to production, evolutions and sending external e-mail", "Roadmap"),
         ],
     },
@@ -85,12 +90,33 @@ pre code { background: none; padding: 0; color: inherit; font-size: inherit; }
 .cover .sub { font-size: 15pt; color: #E6D9B5; margin-bottom: 4mm; }
 .cover .line { width: 40mm; height: 4px; background: var(--gold); margin: 8mm 0; }
 .cover .meta { position: absolute; left: 22mm; bottom: 22mm; font-size: 10.5pt; color: #C9D3E8; }
+.mermaid { text-align: center; margin: 4mm 0 6mm; page-break-inside: avoid; }
+.mermaid svg { max-width: 100%; height: auto; }
 .toc { page-break-after: always; }
 .toc h1 { page-break-before: avoid; }
 .toc ol { list-style: none; padding: 0; margin: 4mm 0; }
 .toc li { padding: 2mm 0; border-bottom: 1px dotted var(--line); font-size: 11.5pt; }
 .toc li small { color: var(--muted); display: block; font-size: 9pt; }
 """
+
+
+def mermaid_script() -> str:
+    """Mermaid renders the ```mermaid blocks (the same ones GitHub draws); the library is fetched once and cached."""
+    if not MERMAID.exists():
+        import urllib.request
+        MERMAID.parent.mkdir(parents=True, exist_ok=True)
+        urllib.request.urlretrieve(f"https://cdn.jsdelivr.net/npm/mermaid@{MERMAID_VERSION}/dist/mermaid.min.js", MERMAID)
+    theme = ("{startOnLoad:true,theme:'base',securityLevel:'loose',flowchart:{htmlLabels:true,curve:'basis'},"
+             "themeVariables:{fontFamily:'Segoe UI, Arial, sans-serif',fontSize:'13px',primaryColor:'#EFE9DB',primaryBorderColor:'#002E6C',"
+             "primaryTextColor:'#1B2433',lineColor:'#22317F',secondaryColor:'#DDE6F5',tertiaryColor:'#F7F8FB',noteBkgColor:'#FDF6E3',"
+             "actorBkg:'#002E6C',actorTextColor:'#ffffff',actorBorder:'#002E6C',signalColor:'#22317F'}}")
+    return f'<script src="{MERMAID.as_uri()}"></script><script>mermaid.initialize({theme});</script>'
+
+
+def mermaid_blocks(h: str) -> str:
+    def repl(m):
+        return '<div class="mermaid">' + html.unescape(m.group(1)) + '</div>'
+    return re.sub(r'<pre><code class="language-mermaid">(.*?)</code></pre>', repl, h, flags=re.S)
 
 
 def page(cfg: dict, src: Path, title: str, parts: list, subtitle: str) -> str:
@@ -108,11 +134,12 @@ def page(cfg: dict, src: Path, title: str, parts: list, subtitle: str) -> str:
     bodies = []
     for i, (name, _t, _s, _f) in enumerate(parts):
         h = markdown.markdown((src / f"{name}.md").read_text(encoding="utf-8"), extensions=["tables", "fenced_code", "sane_lists"])
+        h = mermaid_blocks(h)
         if i == 0 and not toc:
             h = h.replace("<h1>", '<h1 class="first">', 1)
         bodies.append(h)
     return (f'<!doctype html><html lang="{cfg["html_lang"]}"><head><meta charset="utf-8"><title>{html.escape(title)}</title>'
-            f'<style>{CSS}</style></head><body>{cover}{toc}{"".join(bodies)}</body></html>')
+            f'<style>{CSS}</style></head><body>{cover}{toc}{"".join(bodies)}{mermaid_script()}</body></html>')
 
 
 def browser() -> str:
@@ -136,7 +163,7 @@ def to_pdf(src: Path, html_text: str, out: Path) -> None:
     try:
         profile = tempfile.mkdtemp(prefix="docs-pdf-")
         subprocess.run(
-            [browser(), "--headless=new", "--disable-gpu", f"--user-data-dir={profile}", "--no-pdf-header-footer",
+            [browser(), "--headless=new", "--disable-gpu", f"--user-data-dir={profile}", "--no-pdf-header-footer", "--virtual-time-budget=30000", "--allow-file-access-from-files",
              f"--print-to-pdf={out}", tmp.as_uri()],
             check=True, capture_output=True, timeout=180,
         )
