@@ -30,6 +30,7 @@ func (a *app) internalRoutes(r chi.Router) {
 	r.Post("/calls/{id}/hangup", a.internalHangup)
 	r.Post("/recordings", a.internalRecordings)
 	r.Post("/meetings/{id}/left", a.internalMeetingLeft)
+	r.Post("/meetings/{id}/rc", a.internalMeetingRC)
 }
 
 // internalCreateCall: a desk phone dials an extension. Same routing rules as a PC call.

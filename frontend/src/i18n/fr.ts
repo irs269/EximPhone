@@ -146,6 +146,12 @@ export const fr = {
   'meet.incomingCall': 'Appel vidéo entrant', 'meet.invitation': 'Invitation à une réunion', 'meet.join': 'Rejoindre', 'meet.videoCall': 'Appel vidéo',
   'meet.active': 'En cours', 'meet.recent': 'Récentes', 'meet.empty': 'Démarrez une réunion ou rejoignez-en une en cours.', 'meet.host': 'Organisateur : {name}', 'meet.joined': '{n} connecté(s)', 'meet.ended': 'Terminée',
   'meet.hint': "La caméra et le partage d'écran demandent votre autorisation dans le navigateur.", 'meet.none': 'Aucune réunion.', 'meet.call': 'Appel vidéo',
+  'meet.rc.ask': 'Demander le contrôle', 'meet.rc.waiting': "En attente de l'accord de la personne…", 'meet.rc.controlling': "Vous contrôlez l'écran de {name}", 'meet.rc.stop': 'Arrêter le contrôle',
+  'meet.rc.controlledBy': '{name} contrôle votre écran', 'meet.rc.other': "{controller} contrôle l'écran de {owner}", 'meet.rc.hint': 'Cliquez et tapez dans l\'écran partagé : vos actions sont envoyées à {name}.',
+  'meet.rc.denied.refused': '{name} a refusé la prise en main.', 'meet.rc.denied.not_supported': "Le partage de {name} ne peut pas être pris en main : il faut l'application de bureau et le partage d'un écran entier.",
+  'meet.rc.denied.busy': 'Une prise en main est déjà en cours ou en attente.', 'meet.rc.denied.timeout': "{name} n'a pas répondu.", 'meet.rc.denied.unavailable': "{name} n'est plus disponible.",
+  'meet.rc.stopped.stopped': 'La prise en main est terminée.', 'meet.rc.stopped.stopped_by_owner': '{name} a arrêté la prise en main.', 'meet.rc.stopped.share_stopped': "Le partage d'écran a été arrêté.",
+  'meet.rc.stopped.left': 'Une des deux personnes a quitté la réunion.', 'meet.rc.stopped.expired': "La session de prise en main a expiré (1 heure).", 'meet.rc.stopped.timeout': "{name} n'a pas répondu.", 'meet.rc.stopped.closed': 'La prise en main est terminée.',
   'toast.status': 'Statut : {s}',
 } as const;
 export type Key = keyof typeof fr;

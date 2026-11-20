@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import type { RcInput } from '../rtc/meetingMedia';
 import { t } from '../i18n';
 import { useChat } from '../store/chat';
 import { useMeetings } from '../store/meetings';
@@ -8,8 +9,50 @@ import { UserAvatar } from './Avatar';
 const mmss = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 
 /** One participant (or one shared screen). The audio of a participant plays from the same stream as their video. */
-function Tile({ name, userId, stream, showVideo, micOn, self, screen, fit }: {
-  name: string; userId: number; stream?: MediaStream | null; showVideo: boolean; micOn: boolean; self?: boolean; screen?: boolean; fit?: 'cover' | 'contain';
+type Control = { mode: 'can' | 'pending' | 'active'; onAsk: () => void; onInput: (ev: RcInput) => void };
+
+/**
+ * Sits on top of a shared screen while I control it: turns my mouse and keyboard into events relative to the shared
+ * picture (0..1), so that they land at the right place whatever the size of the tile or of the remote screen.
+ */
+function ControlSurface({ video, onInput }: { video: HTMLVideoElement | null; onInput: (ev: RcInput) => void }) {
+  const box = useRef<HTMLDivElement>(null);
+  const last = useRef(0);
+  useEffect(() => { box.current?.focus(); }, []);
+  useEffect(() => { // wheel events must be cancelable to stop the page from scrolling: a native, non-passive listener
+    const el = box.current;
+    if (!el) return;
+    const onWheel = (e: WheelEvent) => { e.preventDefault(); onInput({ k: 'w', dx: e.deltaX, dy: e.deltaY }); };
+    el.addEventListener('wheel', onWheel, { passive: false });
+    return () => el.removeEventListener('wheel', onWheel);
+  }, [onInput]);
+
+  /** position inside the picture itself (the video is letterboxed when its shape differs from the tile) */
+  const pos = (e: React.MouseEvent) => {
+    const r = (video ?? box.current)?.getBoundingClientRect();
+    if (!r) return { x: 0, y: 0 };
+    const vw = video?.videoWidth || r.width, vh = video?.videoHeight || r.height;
+    const scale = Math.min(r.width / vw, r.height / vh);
+    const cw = vw * scale, ch = vh * scale;
+    const x = (e.clientX - r.left - (r.width - cw) / 2) / cw, y = (e.clientY - r.top - (r.height - ch) / 2) / ch;
+    return { x: Math.min(1, Math.max(0, x)), y: Math.min(1, Math.max(0, y)) };
+  };
+  const key = (down: boolean) => (e: React.KeyboardEvent) => {
+    e.preventDefault(); e.stopPropagation();
+    onInput({ k: down ? 'kd' : 'ku', code: e.code, key: e.key });
+  };
+  return (
+    <div ref={box} className="mcapture" tabIndex={0} role="application" aria-label="remote control"
+      onMouseMove={(e) => { const n = performance.now(); if (n - last.current > 16) { last.current = n; onInput({ k: 'm', ...pos(e) }); } }}
+      onMouseDown={(e) => { e.preventDefault(); box.current?.focus(); onInput({ k: 'd', b: e.button === 2 ? 2 : e.button === 1 ? 1 : 0, ...pos(e) }); }}
+      onMouseUp={(e) => { e.preventDefault(); onInput({ k: 'u', b: e.button === 2 ? 2 : e.button === 1 ? 1 : 0, ...pos(e) }); }}
+      onContextMenu={(e) => e.preventDefault()}
+      onKeyDown={key(true)} onKeyUp={key(false)} />
+  );
+}
+
+function Tile({ name, userId, stream, showVideo, micOn, self, screen, fit, ctl }: {
+  name: string; userId: number; stream?: MediaStream | null; showVideo: boolean; micOn: boolean; self?: boolean; screen?: boolean; fit?: 'cover' | 'contain'; ctl?: Control;
 }) {
   const ref = useRef<HTMLVideoElement>(null);
   useEffect(() => {
@@ -20,10 +63,16 @@ function Tile({ name, userId, stream, showVideo, micOn, self, screen, fit }: {
     }
   }, [stream]);
   return (
-    <div className={'mtile' + (screen ? ' screen' : '')} role="group" aria-label={name}>
+    <div className={'mtile' + (screen ? ' screen' : '') + (ctl?.mode === 'active' ? ' controlled' : '')} role="group" aria-label={name}>
       {/* the video element stays mounted even when the camera is off, so that the person is still heard */}
       <video ref={ref} autoPlay playsInline muted={!!self} style={{ objectFit: fit ?? 'cover', visibility: showVideo ? 'visible' : 'hidden' }} />
       {!showVideo && <div className="mavatar"><UserAvatar u={{ id: userId, display_name: name }} /></div>}
+      {ctl?.mode === 'active' && <ControlSurface video={ref.current} onInput={ctl.onInput} />}
+      {ctl && ctl.mode !== 'active' && (
+        <button type="button" className="mrcbtn" disabled={ctl.mode === 'pending'} onClick={ctl.onAsk}>
+          {ctl.mode === 'pending' ? t('meet.rc.waiting') : t('meet.rc.ask')}
+        </button>
+      )}
       <div className="mname">
         {!micOn && !screen && <span className="mmute" title={t('meet.muted')}><Icon name="mic" size={13} /></span>}
         {screen && <Icon name="screen" size={13} />}
@@ -37,6 +86,7 @@ export function MeetingRoom() {
   const room = useMeetings((s) => s.room);
   useMeetings((s) => s.version); // re-render when the media client changes
   const { media, toggleMic, toggleCam, toggleScreen, leave, end, addPeople } = useMeetings();
+  const sendInput = useRef<(ev: RcInput) => void>(() => undefined);
   const users = useChat((s) => s.users);
   const me = useChat((s) => s.me);
   const [secs, setSecs] = useState(0);
@@ -55,6 +105,16 @@ export function MeetingRoom() {
   if (!room || !c) return null;
 
   const nameOf = (id: number) => users[id]?.display_name ?? '#' + id;
+  sendInput.current = (ev) => c.sendInput(ev);
+  const onInput = (ev: RcInput) => sendInput.current(ev);
+  const controlOf = (owner: number, self: boolean): Control | undefined => {
+    if (self) return undefined;
+    if (c.controlling === owner) return { mode: 'active', onAsk: () => undefined, onInput };
+    if (c.rcPending === owner) return { mode: 'pending', onAsk: () => undefined, onInput };
+    const p = c.peers.get(owner);
+    if (p?.rc && c.controlling === null && c.rcPending === null && !c.rcSession) return { mode: 'can', onAsk: () => c.requestControl(owner), onInput };
+    return undefined;
+  };
   const peers = [...c.peers.values()];
   const screens = [
     ...(c.screen && c.localScreen ? [{ id: me, name: nameOf(me), stream: c.localScreen as MediaStream, self: true }] : []),
@@ -82,11 +142,22 @@ export function MeetingRoom() {
         {room.status === 'connecting' && <span className="mstate">{t('meet.connecting')}</span>}
       </header>
       {room.notice && <div className="mnotice" role="status">{room.notice}</div>}
+      {c.controlling !== null && (
+        <div className="mrcbar" role="status"><span>{t('meet.rc.controlling', { name: nameOf(c.controlling) })} · {t('meet.rc.hint', { name: nameOf(c.controlling) })}</span>
+          <button type="button" onClick={() => c.stopControl()}>{t('meet.rc.stop')}</button></div>
+      )}
+      {c.controlledBy !== null && (
+        <div className="mrcbar danger" role="alert"><span>{t('meet.rc.controlledBy', { name: nameOf(c.controlledBy) })}</span>
+          <button type="button" onClick={() => c.stopControl()}>{t('meet.rc.stop')}</button></div>
+      )}
+      {c.rcSession && c.controlling === null && c.controlledBy === null && (
+        <div className="mrcbar quiet" role="status"><span>{t('meet.rc.other', { controller: nameOf(c.rcSession.controller), owner: nameOf(c.rcSession.owner) })}</span></div>
+      )}
 
       <div className={'mstage' + (screens.length ? ' withscreen' : '')}>
         {screens.length > 0 && (
           <div className="mscreens">
-            {screens.map((s) => <Tile key={'s' + s.id} name={s.name} userId={s.id} stream={s.stream} showVideo micOn screen fit="contain" self={s.self} />)}
+            {screens.map((s) => <Tile key={'s' + s.id} name={s.name} userId={s.id} stream={s.stream} showVideo micOn screen fit="contain" self={s.self} ctl={controlOf(s.id, s.self)} />)}
           </div>
         )}
         <div className="mgrid" style={screens.length ? undefined : { gridTemplateColumns: `repeat(${cols}, 1fr)` }}>{tiles}</div>

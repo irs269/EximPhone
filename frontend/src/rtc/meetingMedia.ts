@@ -9,6 +9,8 @@ export interface PeerView {
   mic: boolean;
   cam: boolean;
   screen: boolean;
+  /** the shared screen can be remote-controlled (desktop app, whole screen) */
+  rc: boolean;
   /** microphone + camera of that person (the audio is played from here) */
   camStream?: MediaStream;
   screenStream?: MediaStream;
@@ -22,17 +24,38 @@ export interface MeetingOptions {
   onChange: () => void;
   onEnded: () => void;
   onError: (code: 'full' | 'closed' | 'negotiation') => void;
+  nameOf: (user: number) => string;
+  /** a short notice about remote control to show to the person (refused, ended, ...) */
+  onRcNotice: (code: string, who: string) => void;
 }
+
+/** The desktop app (Electron) exposes this; a plain browser does not, and then nobody can control this computer. */
+interface DesktopRC {
+  available(): Promise<boolean>;
+  begin(name: string): Promise<{ ok: boolean; reason?: string }>;
+  input(ev: unknown): void;
+  end(): void;
+  sharedScreen(): Promise<{ controllable: boolean }>;
+  shareStopped(): void;
+  onEnded(cb: (reason: string) => void): void;
+}
+const desktop = (): DesktopRC | null => (window as unknown as { eximDesktop?: { remoteControl?: DesktopRC } }).eximDesktop?.remoteControl ?? null;
+
+export interface RcInput { k: 'm' | 'd' | 'u' | 'w' | 'kd' | 'ku'; x?: number; y?: number; b?: number; dx?: number; dy?: number; code?: string; key?: string }
 
 interface Msg {
   type: string;
   sdp?: string;
   you?: number;
   user?: number;
-  peers?: { user: number; mic: boolean; cam: boolean; screen: boolean }[];
+  peers?: { user: number; mic: boolean; cam: boolean; screen: boolean; rc?: boolean }[];
   mic?: boolean;
   cam?: boolean;
   screen?: boolean;
+  rc?: boolean;
+  owner?: number;
+  reason?: string;
+  ev?: RcInput;
   error?: string;
 }
 
@@ -55,6 +78,12 @@ export class MeetingClient {
   localStream: MediaStream | null = null; // microphone + camera
   localScreen: MediaStream | null = null;
   connected = false;
+  /** remote control: who I am controlling, who controls my screen, my pending request, and any session in the room */
+  controlling: number | null = null;
+  controlledBy: number | null = null;
+  rcPending: number | null = null;
+  rcSession: { owner: number; controller: number } | null = null;
+  rcCapable = false;
 
   private ws: WebSocket | null = null;
   private pub: RTCPeerConnection | null = null;
@@ -73,7 +102,7 @@ export class MeetingClient {
   private send(m: object) { if (this.ws?.readyState === WebSocket.OPEN) this.ws.send(JSON.stringify(m)); }
   private peer(user: number): PeerView {
     let p = this.peers.get(user);
-    if (!p) { p = { user, mic: true, cam: false, screen: false }; this.peers.set(user, p); }
+    if (!p) { p = { user, mic: true, cam: false, screen: false, rc: false }; this.peers.set(user, p); }
     return p;
   }
 
@@ -122,7 +151,7 @@ export class MeetingClient {
     switch (m.type) {
       case 'joined':
         this.me = m.you ?? 0;
-        (m.peers ?? []).forEach((p) => { const v = this.peer(p.user); v.mic = p.mic; v.cam = p.cam; v.screen = p.screen; });
+        (m.peers ?? []).forEach((p) => { const v = this.peer(p.user); v.mic = p.mic; v.cam = p.cam; v.screen = p.screen; v.rc = !!p.rc; });
         await this.captured; // the user may still be answering the camera and microphone prompt
         if (this.closed) return;
         await this.setupConnections();
@@ -132,11 +161,16 @@ export class MeetingClient {
       case 'peer_joined': if (m.user) this.peer(m.user); this.notify(); break;
       case 'peer_left': if (m.user) this.peers.delete(m.user); this.notify(); break;
       case 'state':
-        if (m.user) { const v = this.peer(m.user); v.mic = !!m.mic; v.cam = !!m.cam; v.screen = !!m.screen; if (!v.screen) delete v.screenStream; }
+        if (m.user) { const v = this.peer(m.user); v.mic = !!m.mic; v.cam = !!m.cam; v.screen = !!m.screen; v.rc = !!m.rc; if (!v.screen) delete v.screenStream; }
         this.notify();
         break;
       case 'publish_answer': this.answerWaiter?.(m.sdp ?? ''); this.answerWaiter = null; break;
       case 'sub_offer': this.queue = this.queue.then(() => this.answerSubscribe(m.sdp ?? '')).catch(() => undefined); break;
+      case 'rc_request': void this.onControlRequest(m.user ?? 0); break;
+      case 'rc_started': this.onControlStarted(m.owner ?? 0, m.user ?? 0); break;
+      case 'rc_denied': this.onControlDenied(m.user ?? 0, m.reason ?? ''); break;
+      case 'rc_stopped': this.onControlStopped(m.owner ?? 0, m.user ?? 0, m.reason ?? ''); break;
+      case 'rc_input': if (m.ev && this.controlledBy !== null) desktop()?.input(m.ev); break;
       case 'ended': this.closed = true; this.opt.onEnded(); break;
       case 'error': this.opt.onError(m.error?.includes('full') ? 'full' : 'negotiation'); break;
     }
@@ -147,6 +181,10 @@ export class MeetingClient {
     this.sub = new RTCPeerConnection(cfg);
     this.sub.ontrack = (e) => this.onRemoteTrack(e);
     this.pub = new RTCPeerConnection(cfg);
+    desktop()?.onEnded((reason) => { // the stop button, the shortcut or the expiry of the native session on this computer
+      if (this.controlledBy !== null) this.send({ type: 'rc_stop' });
+      this.onControlStopped(this.me, this.controlledBy ?? 0, reason);
+    });
 
     const stream = this.localStream ?? new MediaStream();
     const audio = stream.getAudioTracks()[0];
@@ -205,7 +243,7 @@ export class MeetingClient {
     this.notify();
   }
 
-  private sendState(): void { this.send({ type: 'state', mic: this.mic, cam: this.cam, screen: this.screen }); }
+  private sendState(): void { this.send({ type: 'state', mic: this.mic, cam: this.cam, screen: this.screen, rc: this.rcCapable }); }
 
   // ---------- controls ----------
 
@@ -254,6 +292,10 @@ export class MeetingClient {
     const tr = this.pub.addTransceiver(track, { direction: 'sendonly', streams: [display], sendEncodings: [{ maxBitrate: 2_000_000 }] });
     this.screenSender = tr.sender;
     this.screen = true;
+    // in the desktop app a whole screen (not a window) can be remote-controlled, if the person later accepts
+    const d = desktop();
+    this.rcCapable = false;
+    if (d) { try { this.rcCapable = (await d.available()) && (await d.sharedScreen()).controllable; } catch { /* not controllable */ } }
     track.onended = () => { void this.stopScreen(); }; // the browser's own "Stop sharing" button
     this.sendState();
     await this.renegotiatePublish();
@@ -264,6 +306,8 @@ export class MeetingClient {
   async stopScreen(): Promise<void> {
     if (!this.screen) return;
     this.screen = false;
+    this.rcCapable = false;
+    desktop()?.shareStopped();
     this.localScreen?.getTracks().forEach((t) => t.stop());
     if (this.screenSender && this.pub) { try { this.pub.removeTrack(this.screenSender); } catch { /* already closed */ } }
     if (this.localScreen) delete this.sources[this.localScreen.id];
@@ -274,9 +318,74 @@ export class MeetingClient {
     this.notify();
   }
 
+  // ---------- remote control ----------
+
+  /** I ask to control the screen of `owner`. */
+  requestControl(owner: number): void {
+    if (this.controlling !== null || this.rcPending !== null) return;
+    this.rcPending = owner;
+    this.send({ type: 'rc_request', user: owner });
+    this.notify();
+  }
+
+  /** Ends the session I am part of, as the controller or as the owner. */
+  stopControl(): void {
+    this.send({ type: 'rc_stop' });
+    if (this.controlledBy !== null) desktop()?.end();
+    this.rcPending = null;
+    this.notify();
+  }
+
+  /** Sends one mouse or keyboard event to the person I control. */
+  sendInput(ev: RcInput): void {
+    if (this.controlling !== null) this.send({ type: 'rc_input', ev });
+  }
+
+  /** Somebody asks to control my screen: only the native dialog of the desktop app can accept. */
+  private async onControlRequest(controller: number): Promise<void> {
+    const d = desktop();
+    let ok = false;
+    if (d && this.rcCapable) {
+      try { ok = (await d.begin(this.opt.nameOf(controller))).ok; } catch { ok = false; }
+    }
+    if (ok) {
+      this.controlledBy = controller;
+      this.send({ type: 'rc_accept', user: controller });
+      // if the server does not confirm (the request had expired meanwhile), the native session must not stay open
+      window.setTimeout(() => { if (this.controlledBy === controller && this.rcSession?.owner !== this.me) { desktop()?.end(); this.controlledBy = null; this.notify(); } }, 4000);
+    } else {
+      this.send({ type: 'rc_deny', user: controller });
+    }
+    this.notify();
+  }
+
+  private onControlStarted(owner: number, controller: number): void {
+    this.rcSession = { owner, controller };
+    if (controller === this.me) { this.controlling = owner; this.rcPending = null; }
+    if (owner === this.me) this.controlledBy = controller;
+    this.notify();
+  }
+
+  private onControlDenied(owner: number, reason: string): void {
+    if (this.rcPending === owner) this.rcPending = null;
+    this.opt.onRcNotice('denied.' + reason, this.opt.nameOf(owner));
+    this.notify();
+  }
+
+  private onControlStopped(owner: number, controller: number, reason: string): void {
+    const mine = owner === this.me || controller === this.me;
+    this.rcSession = null;
+    if (this.controlling === owner) this.controlling = null;
+    if (this.controlledBy !== null && owner === this.me) { desktop()?.end(); this.controlledBy = null; }
+    if (this.rcPending === owner) this.rcPending = null;
+    if (mine && reason) this.opt.onRcNotice('stopped.' + reason, this.opt.nameOf(owner === this.me ? controller : owner));
+    this.notify();
+  }
+
   /** Leaves the meeting (the server notices the closed socket) and releases the camera, microphone and screen. */
   stop(): void {
     this.closed = true;
+    if (this.controlledBy !== null) desktop()?.end();
     this.send({ type: 'leave' });
     this.ws?.close();
     this.pub?.close();

@@ -433,3 +433,31 @@ func (a *app) internalMeetingLeft(w http.ResponseWriter, r *http.Request) {
 	a.markLeft(r.Context(), id, body.UserID)
 	w.WriteHeader(http.StatusNoContent)
 }
+
+// internalMeetingRC: the media service reports that remote control of a shared screen started or stopped.
+// Both people are named in the audit log: this is the trace of who could act on whose computer, and for how long.
+func (a *app) internalMeetingRC(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	id, ok := meetingID(r)
+	var body struct {
+		Owner      int64  `json:"owner"`
+		Controller int64  `json:"controller"`
+		Action     string `json:"action"`
+		Reason     string `json:"reason"`
+		Seconds    int    `json:"seconds"`
+	}
+	if !ok || !decodeBody(w, r, &body) || (body.Action != "started" && body.Action != "stopped") || body.Owner == 0 || body.Controller == 0 {
+		apiError(w, 400, "invalid request")
+		return
+	}
+	var ownerName, controllerName string
+	_ = a.st.db.QueryRow(ctx, `SELECT username::text FROM users WHERE id=$1`, body.Owner).Scan(&ownerName)
+	_ = a.st.db.QueryRow(ctx, `SELECT username::text FROM users WHERE id=$1`, body.Controller).Scan(&controllerName)
+	details := map[string]any{"meeting_id": id, "owner_id": body.Owner, "owner": ownerName}
+	if body.Action == "stopped" {
+		details["reason"] = body.Reason
+		details["seconds"] = body.Seconds
+	}
+	a.st.audit(ctx, &body.Controller, controllerName, "remote_control_"+body.Action, "", details)
+	w.WriteHeader(http.StatusNoContent)
+}

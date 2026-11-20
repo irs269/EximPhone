@@ -4,6 +4,7 @@ import type { Meeting, MeetingInvite } from '../api/client';
 import { MeetingClient } from '../rtc/meetingMedia';
 import { t } from '../i18n';
 import { useApp } from './app';
+import { useChat } from './chat';
 
 export interface Room {
   id: string;
@@ -73,6 +74,13 @@ export const useMeetings = create<MeetingsState>((set, get) => ({
         const r = get().room;
         if (r && c.connected && r.status !== 'live') set({ room: { ...r, status: 'live' } });
         set((s) => ({ version: s.version + 1 }));
+      },
+      nameOf: (id) => useChat.getState().users[id]?.display_name ?? '#' + id,
+      onRcNotice: (code, who) => {
+        const r = get().room;
+        const key = ('meet.rc.' + code) as Parameters<typeof t>[0];
+        const text = t(key, { name: who });
+        if (r) set({ room: { ...r, notice: text } });
       },
       onEnded: () => { void get().leave(); },
       onError: (code) => {

@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data:; style-src 'unsafe-inline'; script-src 'unsafe-inline'">
+  <title>Exim Connect</title>
+  <style>
+    body{margin:0;font:14px "Segoe UI",sans-serif;color:#1c2a44;background:#f4f6fa;display:flex;flex-direction:column;height:100vh}
+    header{padding:16px 20px 6px}h1{margin:0;font-size:17px;color:#0a2f6b}p{margin:4px 0 0;color:#5b6b85;font-size:12.5px}
+    main{flex:1;overflow:auto;padding:10px 20px;display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px;align-content:start}
+    h2{grid-column:1/-1;margin:8px 0 0;font-size:13px;color:#0a2f6b}
+    button.tile{border:2px solid transparent;background:#fff;border-radius:10px;padding:8px;cursor:pointer;text-align:left;font:inherit;color:inherit}
+    button.tile:hover{border-color:#b9c5db}button.tile.sel{border-color:#0a2f6b;background:#e9eefb}
+    button.tile img{width:100%;height:120px;object-fit:contain;background:#dfe5f0;border-radius:6px;display:block}
+    button.tile span{display:block;margin-top:6px;font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    footer{padding:12px 20px;display:flex;gap:10px;justify-content:flex-end;background:#fff;border-top:1px solid #dfe5f0}
+    footer button{border:0;border-radius:8px;padding:10px 18px;font:inherit;font-weight:600;cursor:pointer}
+    #ok{background:#0a2f6b;color:#fff}#ok:disabled{opacity:.45;cursor:not-allowed}#no{background:#e9eefb;color:#0a2f6b}
+  </style>
+</head>
+<body>
+  <header><h1 id="t"></h1><p id="n"></p></header>
+  <main id="list"></main>
+  <footer><button id="no"></button><button id="ok" disabled></button></footer>
+  <script>
+    const $ = (id) => document.getElementById(id);
+    let chosen = null;
+    window.nativeUi.onSources((sources, fr) => {
+      document.documentElement.lang = fr ? 'fr' : 'en';
+      $('t').textContent = fr ? 'Quel contenu partager ?' : 'What do you want to share?';
+      $('n').textContent = fr ? 'Seul un écran entier peut être pris en main à distance par un participant, et seulement si vous l’acceptez.' : 'Only a whole screen can be remote-controlled by a participant, and only if you accept it.';
+      $('no').textContent = fr ? 'Annuler' : 'Cancel';
+      $('ok').textContent = fr ? 'Partager' : 'Share';
+      const list = $('list');
+      const group = (title, items) => {
+        if (!items.length) return;
+        const h = document.createElement('h2'); h.textContent = title; list.appendChild(h);
+        for (const s of items) {
+          const b = document.createElement('button'); b.className = 'tile'; b.type = 'button';
+          const img = document.createElement('img'); img.src = s.thumb; img.alt = '';
+          const sp = document.createElement('span'); sp.textContent = s.name;
+          b.append(img, sp);
+          b.onclick = () => { chosen = s.id; document.querySelectorAll('.tile').forEach((x) => x.classList.toggle('sel', x === b)); $('ok').disabled = false; };
+          b.ondblclick = () => window.nativeUi.choose(s.id);
+          list.appendChild(b);
+        }
+      };
+      group(fr ? 'Écrans' : 'Screens', sources.filter((s) => s.screen));
+      group(fr ? 'Fenêtres' : 'Windows', sources.filter((s) => !s.screen));
+    });
+    $('ok').onclick = () => { if (chosen) window.nativeUi.choose(chosen); };
+    $('no').onclick = () => window.nativeUi.choose(null);
+  </script>
+</body>
+</html>

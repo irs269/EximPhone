@@ -72,6 +72,10 @@ type sigMsg struct {
 	Mic     *bool             `json:"mic,omitempty"`
 	Cam     *bool             `json:"cam,omitempty"`
 	Screen  *bool             `json:"screen,omitempty"`
+	RC      *bool             `json:"rc,omitempty"` // the participant shares a whole screen from the desktop app and can be remote-controlled
+	Ev      json.RawMessage   `json:"ev,omitempty"` // remote control input event
+	Reason  string            `json:"reason,omitempty"`
+	Owner   int64             `json:"owner,omitempty"`
 	User    int64             `json:"user,omitempty"`
 	You     int64             `json:"you,omitempty"`
 	Peers   []peerInfo        `json:"peers,omitempty"`
@@ -83,6 +87,7 @@ type peerInfo struct {
 	Mic    bool  `json:"mic"`
 	Cam    bool  `json:"cam"`
 	Screen bool  `json:"screen"`
+	RC     bool  `json:"rc"`
 }
 
 // ---------- room ----------
@@ -115,6 +120,7 @@ type participant struct {
 	published map[string]*pubTrack
 	mic, cam  bool
 	screen    bool
+	rc        bool
 
 	negMu       sync.Mutex
 	negotiating bool
@@ -128,6 +134,10 @@ type mRoom struct {
 	mm    *meetings
 	mu    sync.Mutex
 	parts map[int64]*participant
+
+	rcMu     sync.Mutex // remote control: pending requests and active grants, by the owner of the screen
+	rcPend   map[int64]*rcPending
+	rcActive map[int64]*rcGrant
 }
 
 type meetings struct {
@@ -430,7 +440,7 @@ func (r *mRoom) admit(p *participant) ([]peerInfo, *participant, error) {
 	for u, o := range r.parts {
 		if u != p.user {
 			o.mu.Lock()
-			peers = append(peers, peerInfo{User: u, Mic: o.mic, Cam: o.cam, Screen: o.screen})
+			peers = append(peers, peerInfo{User: u, Mic: o.mic, Cam: o.cam, Screen: o.screen, RC: o.rc})
 			o.mu.Unlock()
 		}
 	}
@@ -457,6 +467,7 @@ func (mm *meetings) remove(r *mRoom, p *participant) {
 	p.negMu.Lock()
 	p.closed = true
 	p.negMu.Unlock()
+	r.rcEndInvolving(p.user, "left")
 	r.mu.Lock()
 	replaced := r.parts[p.user] != p // a newer connection of the same user took the seat
 	if !replaced {
@@ -602,7 +613,14 @@ func (mm *meetings) serve(jwtSecret []byte) http.HandlerFunc {
 				if msg.Screen != nil {
 					p.screen = *msg.Screen
 				}
-				state := sigMsg{Type: "state", User: user, Mic: boolp(p.mic), Cam: boolp(p.cam), Screen: boolp(p.screen)}
+				rcOff := p.rc && ((msg.RC != nil && !*msg.RC) || screenOff)
+				if msg.RC != nil {
+					p.rc = *msg.RC
+				}
+				if screenOff {
+					p.rc = false
+				}
+				state := sigMsg{Type: "state", User: user, Mic: boolp(p.mic), Cam: boolp(p.cam), Screen: boolp(p.screen), RC: boolp(p.rc)}
 				var screenTracks []*pubTrack
 				if screenOff { // stopping the share removes its track right away, without waiting for the renegotiation
 					for k, pt := range p.published {
@@ -616,7 +634,20 @@ func (mm *meetings) serve(jwtSecret []byte) http.HandlerFunc {
 				for _, pt := range screenTracks {
 					r.unsubscribeAll(pt)
 				}
+				if rcOff { // the screen is no longer shared (or no longer controllable): any control session ends with it
+					r.rcEndInvolving(user, "share_stopped")
+				}
 				r.broadcast(user, state)
+			case "rc_request":
+				r.rcRequest(user, msg.User)
+			case "rc_accept":
+				r.rcAnswer(user, msg.User, true)
+			case "rc_deny":
+				r.rcAnswer(user, msg.User, false)
+			case "rc_stop":
+				r.rcEndInvolving(user, "stopped")
+			case "rc_input":
+				r.rcInput(user, msg.Ev)
 			case "leave":
 				return
 			}
@@ -628,7 +659,7 @@ func boolp(b bool) *bool { return &b }
 
 // notifyMeeting tells the api that a participant left (best effort).
 func (m *manager) notifyMeeting(meetingID string, user int64, what string) {
-	base := os.Getenv("API_URL")
+	base := apiBase()
 	if base == "" {
 		return
 	}
@@ -636,7 +667,7 @@ func (m *manager) notifyMeeting(meetingID string, user int64, what string) {
 	go func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
-		req, err := http.NewRequestWithContext(ctx, http.MethodPost, strings.TrimRight(base, "/")+"/internal/meetings/"+meetingID+"/"+what, bytes.NewReader(body))
+		req, err := http.NewRequestWithContext(ctx, http.MethodPost, base+"/internal/meetings/"+meetingID+"/"+what, bytes.NewReader(body))
 		if err != nil {
 			return
 		}
@@ -647,3 +678,5 @@ func (m *manager) notifyMeeting(meetingID string, user int64, what string) {
 		}
 	}()
 }
+
+func apiBase() string { return strings.TrimRight(os.Getenv("API_URL"), "/") }

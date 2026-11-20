@@ -7,7 +7,8 @@
   "main": "main.js",
   "scripts": {
     "start": "electron .",
-    "dist": "electron-builder --win"
+    "dist": "electron-builder --win",
+    "test": "node --test test/remote.test.js"
   },
   "devDependencies": {
     "electron": "^33.2.0",
@@ -16,8 +17,30 @@
   "build": {
     "appId": "tz.eximbank.eximphone",
     "productName": "Exim Connect",
-    "files": ["main.js", "offline.html"],
-    "win": { "target": "nsis" },
-    "nsis": { "oneClick": false, "perMachine": true, "allowToChangeInstallationDirectory": true }
+    "files": [
+      "main.js",
+      "offline.html",
+      "preload.js",
+      "ui-preload.js",
+      "remote.js",
+      "keymap.js",
+      "winDriver.js",
+      "picker.html",
+      "banner.html"
+    ],
+    "win": {
+      "target": "nsis"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": true,
+      "allowToChangeInstallationDirectory": true
+    },
+    "asarUnpack": [
+      "node_modules/koffi/**"
+    ]
+  },
+  "dependencies": {
+    "koffi": "^3.3.8"
   }
 }

@@ -51,4 +51,4 @@ Service tickets (file for a service, head approves or rejects, then assigns to a
 
 Internal mail (compose with To/Cc/Bcc, drafts, conversations, attachments, folders, search): see [docs/mail.md](docs/mail.md). External mail (SMTP relay and IMAP mailbox of the existing mail server) is supported and optional: see the settings in that document.
 
-Video meetings (up to 12 people), video calls and screen sharing through an SFU in the media service: see [docs/meetings.md](docs/meetings.md). Remote control of a shared screen is planned as the next stage.
+Video meetings (up to 12 people), video calls and screen sharing through an SFU in the media service: see [docs/meetings.md](docs/meetings.md). Remote control of a shared screen (owner uses the desktop app, accepts each time, banner and stop shortcut, audited) is described in the same document.

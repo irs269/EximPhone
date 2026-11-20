@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'">
+  <title>Exim Connect</title>
+  <style>
+    html,body{margin:0;height:100%;overflow:hidden;font:13.5px "Segoe UI",sans-serif}
+    #bar{height:100%;box-sizing:border-box;display:flex;align-items:center;gap:12px;padding:0 12px 0 16px;background:#c4203a;color:#fff;border-radius:10px;border:2px solid #fff}
+    #dot{width:10px;height:10px;border-radius:50%;background:#fff;animation:p 1.2s infinite}
+    @keyframes p{50%{opacity:.25}}
+    #msg{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:600}
+    button{border:0;border-radius:7px;background:#fff;color:#c4203a;font:inherit;font-weight:700;padding:6px 12px;cursor:pointer}
+  </style>
+</head>
+<body>
+  <div id="bar"><i id="dot"></i><span id="msg"></span><button id="stop" type="button"></button></div>
+  <script>
+    const q = new URLSearchParams(location.search), fr = q.get('fr') === '1', name = q.get('name') || '?';
+    document.getElementById('msg').textContent = fr ? name + ' contrôle votre écran' : name + ' is controlling your screen';
+    const b = document.getElementById('stop');
+    b.textContent = (fr ? 'Arrêter' : 'Stop') + ' (Ctrl+Alt+Maj+X)'.replace('Maj', fr ? 'Maj' : 'Shift');
+    b.onclick = () => window.nativeUi.stopControl();
+  </script>
+</body>
+</html>

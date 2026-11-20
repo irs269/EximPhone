@@ -149,5 +149,11 @@ export const en: Record<Key, string> = {
   'meet.incomingCall': 'Incoming video call', 'meet.invitation': 'Meeting invitation', 'meet.join': 'Join', 'meet.videoCall': 'Video call',
   'meet.active': 'In progress', 'meet.recent': 'Recent', 'meet.empty': 'Start a meeting or join one in progress.', 'meet.host': 'Host: {name}', 'meet.joined': '{n} connected', 'meet.ended': 'Ended',
   'meet.hint': 'The camera and screen sharing ask for your permission in the browser.', 'meet.none': 'No meetings.', 'meet.call': 'Video call',
+  'meet.rc.ask': 'Request control', 'meet.rc.waiting': 'Waiting for their approval…', 'meet.rc.controlling': "You are controlling {name}'s screen", 'meet.rc.stop': 'Stop control',
+  'meet.rc.controlledBy': '{name} is controlling your screen', 'meet.rc.other': "{controller} is controlling {owner}'s screen", 'meet.rc.hint': "Click and type in the shared screen: your actions are sent to {name}.",
+  'meet.rc.denied.refused': '{name} declined the request.', 'meet.rc.denied.not_supported': "{name}'s share cannot be controlled: it needs the desktop app and a whole screen being shared.",
+  'meet.rc.denied.busy': 'A control session is already running or pending.', 'meet.rc.denied.timeout': '{name} did not answer.', 'meet.rc.denied.unavailable': '{name} is no longer available.',
+  'meet.rc.stopped.stopped': 'Remote control has ended.', 'meet.rc.stopped.stopped_by_owner': '{name} stopped the remote control.', 'meet.rc.stopped.share_stopped': 'The screen share was stopped.',
+  'meet.rc.stopped.left': 'One of the two people left the meeting.', 'meet.rc.stopped.expired': 'The remote control session expired (1 hour).', 'meet.rc.stopped.timeout': '{name} did not answer.', 'meet.rc.stopped.closed': 'Remote control has ended.',
   'toast.status': 'Status: {s}',
 };

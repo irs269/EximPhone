@@ -165,5 +165,45 @@ let mediaA, mediaB;
   ra.ws.close(); rb.ws.close();
 }
 
+// ---- remote control of a shared screen (signalling only: the desktop app does the rest)
+{
+  const r = (await http(A.token, 'POST', '/meetings', { title: 'Assistance', invitees: [B.id, C.id] })).json;
+  const owner = await joinMedia(A, r.id), ctl = await joinMedia(B, r.id), other = await joinMedia(C, r.id);
+  const send = (c, m) => c.ws.send(JSON.stringify(m));
+  const find = (c, type, f = () => true) => c.msgs.find((m) => m.type === type && f(m));
+
+  send(ctl, { type: 'rc_request', user: A.id });
+  await ctl.until(() => find(ctl, 'rc_denied', (m) => m.reason === 'not_supported')); ok('control of a share that is not controllable is refused (browser, or a window)');
+  send(owner, { type: 'state', screen: true, rc: true });
+  await ctl.until(() => find(ctl, 'state', (m) => m.user === A.id && m.rc === true));
+  send(ctl, { type: 'rc_request', user: A.id });
+  await owner.until(() => find(owner, 'rc_request', (m) => m.user === B.id)); ok('the owner of the screen is asked, with the name of the requester');
+  assert.ok(!find(other, 'rc_request')); ok('...and nobody else');
+  send(ctl, { type: 'rc_input', ev: { k: 'm', x: 0.5, y: 0.5 } });
+  await sleep(300);
+  assert.ok(!find(owner, 'rc_input')); ok('no input is delivered before the owner accepts');
+  send(owner, { type: 'rc_accept', user: B.id });
+  await other.until(() => find(other, 'rc_started', (m) => m.owner === A.id && m.user === B.id)); ok('everybody in the room learns who controls which screen');
+  send(ctl, { type: 'rc_input', ev: { k: 'kd', code: 'KeyA', key: 'a' } });
+  await owner.until(() => find(owner, 'rc_input', (m) => m.ev.code === 'KeyA')); ok('the controller input reaches the owner');
+  send(other, { type: 'rc_input', ev: { k: 'm', x: 0.1, y: 0.1 } });
+  await sleep(300);
+  assert.ok(!owner.msgs.some((m) => m.type === 'rc_input' && m.user === C.id)); ok('input from anybody else is dropped');
+  send(owner, { type: 'rc_stop' });
+  await ctl.until(() => find(ctl, 'rc_stopped', (m) => m.reason === 'stopped')); ok('the owner can stop it at any time');
+  const before = owner.msgs.filter((m) => m.type === 'rc_input').length;
+  send(ctl, { type: 'rc_input', ev: { k: 'm', x: 0.9, y: 0.9 } });
+  await sleep(300);
+  assert.equal(owner.msgs.filter((m) => m.type === 'rc_input').length, before); ok('nothing is delivered after the stop');
+
+  send(ctl, { type: 'rc_request', user: A.id });
+  await owner.until(() => owner.msgs.filter((m) => m.type === 'rc_request').length >= 2);
+  send(owner, { type: 'rc_accept', user: B.id });
+  await ctl.until(() => ctl.msgs.filter((m) => m.type === 'rc_started').length >= 1);
+  send(owner, { type: 'state', screen: false });
+  await ctl.until(() => find(ctl, 'rc_stopped', (m) => m.reason === 'share_stopped')); ok('stopping the screen share ends the control session with it');
+  for (const c of [owner, ctl, other]) c.ws.close();
+}
+
 console.log(`\n${n} checks passed`);
 process.exit(0);
