@@ -200,7 +200,8 @@ if (!app.requestSingleInstanceLock()) {
   app.on('certificate-error', (event, _wc, url, _error, certificate, callback) => {
     const { pin } = settings();
     let sameServer = false;
-    try { sameServer = new URL(url).origin === origin; } catch { /* not a URL */ }
+    // the page is https://host and its WebSocket wss://host: compare the host (and port), not the scheme
+    try { sameServer = new URL(url).host === new URL(origin).host; } catch { /* not a URL */ }
     if (pin && sameServer && certificate.fingerprint === pin) { event.preventDefault(); callback(true); } else { callback(false); }
   });
   app.whenReady().then(() => {
