@@ -30,6 +30,7 @@ import { NewTicketDialog } from './NewTicketDialog';
 import { useTickets } from '../store/tickets';
 import type { TicketView } from '../api/client';
 import { LangSwitch } from './LangSwitch';
+import { DesktopApp } from './DesktopApp';
 import { Announcements } from '../views/Announcements';
 import { Attendance, dayStatus } from '../views/Attendance';
 import { CallOverlay } from './CallOverlay';
@@ -95,6 +96,7 @@ function StatusMenu() {
           <i style={{ background: presenceColor[k] }} /><span><b>{t(`status.${k}`)}</b><small>{t(`status.${k}.d`)}</small></span>
         </button>
       ))}
+      <DesktopApp compact />
       <div className="ft">{t('status.footer')}</div>
     </div>
   );

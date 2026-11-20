@@ -99,3 +99,17 @@ If port 443 is already used on the server (another web server), publish Exim Con
 ## Heads of service (tickets)
 
 Tickets need a head per service: set `INITIAL_DEPT_HEADS="Department=user1,user2;Other=user3"` before the first start (the test script sets IT=asaid, HR=mjuma, Finance=hbakari, Operations=oabdallah, Communication=imoussa), then manage them with `PUT /api/admin/departments/{id}/heads`. Department names must match the directory (`departmentNumber`). See docs/tickets.md.
+
+## Desktop app: download from the web app
+
+The profile menu (click your badge) and the Help page offer **Download and install** for the Windows desktop app. The installer is not in the repository: you build it for your server and publish it in `downloads/`, which nginx serves read-only at `/download/`. Nothing shows until a `manifest.json` is there.
+
+1. **Build** on a Windows PC with Node.js 20+ (first run needs Internet for npm):
+   ```powershell
+   powershell -ExecutionPolicy Bypass -File scripts\build-desktop.ps1 -Url https://your-server -PinServerCertificate
+   ```
+   The address is **baked into the installer**, so users have nothing to configure. `-PinServerCertificate` is for **test servers with a self-signed certificate** only: it reads the certificate the server presents and the app then trusts exactly that one (all other certificates are still verified). Do not use it with a certificate issued by the bank's CA, which Windows already trusts. The build runs in `C:\exim-desk-build` (short path) and is reused.
+2. **Publish**: the script writes `downloads\Exim-Connect-Setup.exe` and `downloads\manifest.json` (version, size, SHA-256). Copy them to the server's `downloads/` folder (`scp downloads\* root@server:~/EximPhone/downloads/`), or on the server run `sh scripts/publish-desktop.sh /path/to/installer.exe 0.1.0`. No restart is needed once the `downloads` mount exists (`docker compose up -d` after a `git pull` the first time).
+3. Users on Windows see the card (version, size, SHA-256); other systems are told to use the browser; people already inside the desktop app see "you are using the PC application".
+
+The installer is **not code-signed**: Windows SmartScreen asks users to click "More info" then "Run anyway" (the card says so). For the bank's PCs, sign it with the bank's code-signing certificate and distribute it through the usual software tools if you prefer. A user can still override the address with `%APPDATA%\Exim Connect\config.json` (`{"url": "...", "certFingerprint": "sha256/..."}`).

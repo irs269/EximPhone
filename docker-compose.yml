@@ -22,6 +22,7 @@ services:
     volumes:
       - ./nginx/templates:/etc/nginx/templates:ro
       - ./nginx/certs:/etc/nginx/certs:ro
+      - ./downloads:/usr/share/nginx/downloads:ro   # desktop installer, see docs/deployment.md
     networks: [front, back]
     depends_on:
       api: {condition: service_healthy}

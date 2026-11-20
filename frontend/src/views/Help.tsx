@@ -4,6 +4,7 @@ import { useCalls } from '../store/calls';
 import { t, useLocale } from '../i18n';
 import { Icon } from '../components/Icon';
 import { UserAvatar } from '../components/Avatar';
+import { DesktopApp } from '../components/DesktopApp';
 
 export const faqIds = [1, 2, 3, 4, 5, 6, 7] as const;
 
@@ -40,6 +41,11 @@ export function Help() {
               </div>
             ))}
             {!agents.length && <div style={{ color: 'var(--muted)', fontSize: 13 }}>{t('help.noIT')}</div>}
+          </section>
+
+          <section className="card" aria-labelledby="help-app">
+            <h4 id="help-app">{t('desk.title')}</h4>
+            <DesktopApp />
           </section>
 
           <section className="card faq" aria-labelledby="help-faq">

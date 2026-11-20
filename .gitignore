@@ -6,3 +6,5 @@ node_modules/
 .load-users.ldif
 credentials.txt
 ldap-mock/employees.generated.ldif
+downloads/*
+!downloads/.gitkeep

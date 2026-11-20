@@ -152,6 +152,11 @@ export const fr = {
   'meet.rc.denied.busy': 'Une prise en main est déjà en cours ou en attente.', 'meet.rc.denied.timeout': "{name} n'a pas répondu.", 'meet.rc.denied.unavailable': "{name} n'est plus disponible.",
   'meet.rc.stopped.stopped': 'La prise en main est terminée.', 'meet.rc.stopped.stopped_by_owner': '{name} a arrêté la prise en main.', 'meet.rc.stopped.share_stopped': "Le partage d'écran a été arrêté.",
   'meet.rc.stopped.left': 'Une des deux personnes a quitté la réunion.', 'meet.rc.stopped.expired': "La session de prise en main a expiré (1 heure).", 'meet.rc.stopped.timeout': "{name} n'a pas répondu.", 'meet.rc.stopped.closed': 'La prise en main est terminée.',
+  'desk.title': 'Application PC', 'desk.sub': 'Version {version} · {size} Mo · pour Windows', 'desk.download': 'Télécharger et installer',
+  'desk.windowsOnly': "Disponible pour Windows. Sur ce système, utilisez le navigateur.", 'desk.installed': "Vous utilisez l'application PC.",
+  'desk.why': "Elle s'ouvre sans navigateur et permet la prise en main à distance de votre écran pendant une réunion, avec votre accord à chaque fois.",
+  'desk.steps': "Après le téléchargement, ouvrez le fichier. Si Windows affiche « Windows a protégé votre ordinateur », cliquez sur « Informations complémentaires » puis « Exécuter quand même ». Suivez l'assistant (droits administrateur requis).",
+  'desk.hash': 'Empreinte SHA-256 du fichier : {hash}',
   'toast.status': 'Statut : {s}',
 } as const;
 export type Key = keyof typeof fr;

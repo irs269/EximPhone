@@ -99,6 +99,15 @@ server {
         proxy_set_header X-Real-IP $remote_addr;
     }
 
+    # The desktop installer and its manifest, published by scripts/build-desktop.ps1 or scripts/publish-desktop.sh.
+    location /download/ {
+        alias /usr/share/nginx/downloads/;
+        autoindex off;
+        default_type application/octet-stream;
+        add_header Cache-Control "no-cache" always;
+        add_header X-Content-Type-Options "nosniff" always;
+    }
+
     location / {
         root /usr/share/nginx/html;
         try_files $uri /index.html;

@@ -7,5 +7,6 @@ export default defineConfig({
   server: { proxy: {
     '/api': { target: 'https://localhost', secure: false, ws: true },
     '/media': { target: 'https://localhost', secure: false, ws: true },
+    '/download': { target: 'https://localhost', secure: false },
   } },
 });

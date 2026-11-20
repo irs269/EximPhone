@@ -155,5 +155,10 @@ export const en: Record<Key, string> = {
   'meet.rc.denied.busy': 'A control session is already running or pending.', 'meet.rc.denied.timeout': '{name} did not answer.', 'meet.rc.denied.unavailable': '{name} is no longer available.',
   'meet.rc.stopped.stopped': 'Remote control has ended.', 'meet.rc.stopped.stopped_by_owner': '{name} stopped the remote control.', 'meet.rc.stopped.share_stopped': 'The screen share was stopped.',
   'meet.rc.stopped.left': 'One of the two people left the meeting.', 'meet.rc.stopped.expired': 'The remote control session expired (1 hour).', 'meet.rc.stopped.timeout': '{name} did not answer.', 'meet.rc.stopped.closed': 'Remote control has ended.',
+  'desk.title': 'PC application', 'desk.sub': 'Version {version} · {size} MB · for Windows', 'desk.download': 'Download and install',
+  'desk.windowsOnly': 'Available for Windows. On this system, use the browser.', 'desk.installed': 'You are using the PC application.',
+  'desk.why': 'It opens without a browser and lets someone take remote control of your screen during a meeting, with your consent each time.',
+  'desk.steps': 'After the download, open the file. If Windows shows "Windows protected your PC", click "More info" then "Run anyway". Follow the installer (administrator rights required).',
+  'desk.hash': 'SHA-256 fingerprint of the file: {hash}',
   'toast.status': 'Status: {s}',
 };

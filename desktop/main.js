@@ -21,15 +21,22 @@ let rc = null;
 const french = () => app.getLocale().toLowerCase().startsWith('fr');
 const tr = (fr, en) => (french() ? fr : en);
 
-function serverUrl() {
-  if (process.env.EXIM_URL) return process.env.EXIM_URL;
-  // Optional per-machine override: %APPDATA%/Exim Connect/config.json -> { "url": "https://eximphone.exim.local" }
-  try {
-    const cfg = JSON.parse(fs.readFileSync(path.join(app.getPath('userData'), 'config.json'), 'utf8'));
-    if (typeof cfg.url === 'string') return cfg.url;
-  } catch { /* no override */ }
-  return DEFAULT_URL;
+/**
+ * Where this installation connects. In order: the EXIM_URL variable, the per-machine file
+ * %APPDATA%/Exim Connect/config.json, the defaults baked into the installer by scripts/build-desktop.ps1
+ * (defaults.json: the address of the server the installer was downloaded from), then localhost.
+ * `pin` is the SHA-256 fingerprint of ONE server certificate to accept even though Windows does not trust it
+ * (a test server with a self-signed certificate). Everything else is still validated: checks are never turned off.
+ */
+function settings() {
+  const read = (file) => { try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch { return {}; } };
+  const baked = read(path.join(__dirname, 'defaults.json'));
+  const local = read(path.join(app.getPath('userData'), 'config.json'));
+  const pick = (k) => (typeof local[k] === 'string' && local[k] ? local[k] : typeof baked[k] === 'string' ? baked[k] : '');
+  return { url: process.env.EXIM_URL || pick('url') || DEFAULT_URL, pin: pick('certFingerprint') };
 }
+
+const serverUrl = () => settings().url;
 
 /** true when the sender is the Exim Connect page itself (never another site, never a child window). */
 function trusted(event) {
@@ -188,6 +195,13 @@ if (!app.requestSingleInstanceLock()) {
   app.on('second-instance', () => {
     const [w] = BrowserWindow.getAllWindows();
     if (w) { if (w.isMinimized()) w.restore(); w.focus(); }
+  });
+  // Accept a self-signed server certificate only when it is exactly the one pinned in the settings.
+  app.on('certificate-error', (event, _wc, url, _error, certificate, callback) => {
+    const { pin } = settings();
+    let sameServer = false;
+    try { sameServer = new URL(url).origin === origin; } catch { /* not a URL */ }
+    if (pin && sameServer && certificate.fingerprint === pin) { event.preventDefault(); callback(true); } else { callback(false); }
   });
   app.whenReady().then(() => {
     Menu.setApplicationMenu(null);

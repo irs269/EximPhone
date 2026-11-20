@@ -26,7 +26,8 @@
       "keymap.js",
       "winDriver.js",
       "picker.html",
-      "banner.html"
+      "banner.html",
+      "defaults.json"
     ],
     "win": {
       "target": "nsis"
