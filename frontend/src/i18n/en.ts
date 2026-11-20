@@ -162,6 +162,7 @@ export const en: Record<Key, string> = {
   'desk.hash': 'SHA-256 fingerprint of the file: {hash}',
   'meet.rc.viewerHint': 'Remote control unavailable: the person must share a whole screen from the PC application.',
   'meet.rc.shareBrowser': 'Remote control is not available from the browser. To allow it, share a whole screen from the PC application (profile menu, "PC application").',
+  'meet.rc.live': 'Remote control active', 'meet.rc.fullscreen': 'Full screen', 'meet.rc.exitFullscreen': 'Exit full screen',
   'meet.rc.shareReady': 'Remote control: ready (whole screen, PC application). Other participants can ask for it.',
   'meet.rc.shareWindow': 'You are sharing a window: remote control is only possible for a whole screen.',
   'meet.rc.shareDriver': 'The PC application cannot drive this computer (unsupported system or missing component).',

@@ -369,10 +369,29 @@ export class MeetingClient {
     this.notify();
   }
 
+  /**
+   * While my screen is being controlled, favour smoothness over sharpness: 30 images per second, a higher bitrate and
+   * "motion" content (the encoder then keeps the frame rate up instead of the detail). Back to text-friendly settings afterwards.
+   */
+  private async tuneScreen(controlled: boolean): Promise<void> {
+    const track = this.localScreen?.getVideoTracks()[0];
+    if (!track || !this.screenSender) return;
+    track.contentHint = controlled ? 'motion' : 'detail';
+    try { await track.applyConstraints({ frameRate: { ideal: controlled ? 30 : 15, max: 30 } }); } catch { /* keep the current rate */ }
+    try {
+      const p = this.screenSender.getParameters();
+      if (p.encodings?.length) {
+        p.encodings[0].maxBitrate = controlled ? 4_000_000 : 2_000_000;
+        p.encodings[0].maxFramerate = controlled ? 30 : 15;
+        await this.screenSender.setParameters(p);
+      }
+    } catch { /* not supported: the defaults stay */ }
+  }
+
   private onControlStarted(owner: number, controller: number): void {
     this.rcSession = { owner, controller };
     if (controller === this.me) { this.controlling = owner; this.rcPending = null; }
-    if (owner === this.me) this.controlledBy = controller;
+    if (owner === this.me) { this.controlledBy = controller; void this.tuneScreen(true); }
     this.notify();
   }
 
@@ -386,7 +405,7 @@ export class MeetingClient {
     const mine = owner === this.me || controller === this.me;
     this.rcSession = null;
     if (this.controlling === owner) this.controlling = null;
-    if (this.controlledBy !== null && owner === this.me) { desktop()?.end(); this.controlledBy = null; }
+    if (this.controlledBy !== null && owner === this.me) { desktop()?.end(); this.controlledBy = null; if (this.screen) void this.tuneScreen(false); }
     if (this.rcPending === owner) this.rcPending = null;
     if (mine && reason) this.opt.onRcNotice('stopped.' + reason, this.opt.nameOf(owner === this.me ? controller : owner));
     this.notify();

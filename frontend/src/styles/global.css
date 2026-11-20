@@ -333,7 +333,19 @@ button.it{width:100%;text-align:left;font:inherit;color:inherit}
 .mrcbtn{position:absolute;left:50%;bottom:48px;transform:translateX(-50%);border:0;border-radius:10px;background:var(--gold);color:var(--navy);font:inherit;font-weight:700;padding:9px 16px;cursor:pointer;box-shadow:0 6px 20px var(--shadow-lg)}
 .mrcbtn:disabled{opacity:.75;cursor:default}
 .mtile .mrcbtn{opacity:0;transition:opacity .15s}.mtile:hover .mrcbtn,.mtile .mrcbtn:focus-visible,.mtile .mrcbtn:disabled{opacity:1}
-.mcapture{position:absolute;inset:0;cursor:crosshair;outline:3px solid var(--gold);outline-offset:-3px;border-radius:14px}
+.mcapture{position:absolute;inset:0;cursor:none;outline:3px solid var(--gold);outline-offset:-3px;border-radius:14px;touch-action:none;user-select:none}
+/* my own pointer, drawn at once: the remote one only comes back with the video */
+.mghost{position:absolute;left:0;top:0;pointer-events:none;opacity:0;will-change:transform;transition:opacity .12s;filter:drop-shadow(0 1px 2px rgba(0,0,0,.45))}
+.mghost svg{display:block}.mghost path{fill:var(--gold);stroke:var(--navy);stroke-width:1.6;stroke-linejoin:round}
+.mrctool{position:absolute;top:10px;left:50%;transform:translateX(-50%);z-index:3;display:flex;align-items:center;gap:10px;padding:6px 8px 6px 12px;border-radius:999px;background:var(--scrim);color:var(--surface);font-size:12.5px;font-weight:600;backdrop-filter:blur(6px);box-shadow:0 6px 20px var(--shadow-lg);opacity:.55;transition:opacity .15s}
+.mtile:hover .mrctool,.mrctool:focus-within{opacity:1}
+.mrcdot{width:8px;height:8px;border-radius:50%;background:var(--gold);box-shadow:0 0 0 0 var(--gold);animation:mrcpulse 1.8s ease-out infinite}
+@keyframes mrcpulse{0%{box-shadow:0 0 0 0 rgba(255,255,255,.45)}100%{box-shadow:0 0 0 8px rgba(255,255,255,0)}}
+@media (prefers-reduced-motion:reduce){.mrcdot{animation:none}}
+.mrctool button{border:0;border-radius:999px;padding:5px 12px;font:inherit;font-weight:700;cursor:pointer;background:rgba(255,255,255,.16);color:var(--surface)}
+.mrctool button:hover{background:rgba(255,255,255,.28)}
+.mrctool button.stop{background:var(--alert);color:var(--surface)}
+.mtile:fullscreen{border-radius:0;background:#000}
 .mtile.controlled{box-shadow:0 0 0 3px var(--gold)}
 .mrcbar{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 22px;background:var(--gold);color:var(--navy);font-size:13.5px;font-weight:600}
 .mrcbar.danger{background:var(--alert);color:var(--surface)}

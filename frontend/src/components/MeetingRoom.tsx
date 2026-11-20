@@ -8,27 +8,54 @@ import { UserAvatar } from './Avatar';
 
 const mmss = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 
-/** One participant (or one shared screen). The audio of a participant plays from the same stream as their video. */
-type Control = { mode: 'can' | 'pending' | 'active' | 'unavailable'; onAsk: () => void; onInput: (ev: RcInput) => void };
+/** What the viewer can do with a shared screen: ask for control, wait, or control it. */
+type Control = { mode: 'can' | 'pending' | 'active' | 'unavailable'; onAsk: () => void; onInput: (ev: RcInput) => void; onStop?: () => void };
 
 /**
  * Sits on top of a shared screen while I control it: turns my mouse and keyboard into events relative to the shared
  * picture (0..1), so that they land at the right place whatever the size of the tile or of the remote screen.
+ *
+ * Built for smoothness: pointer moves are merged to one per display frame (always the latest position), the pointer is
+ * captured during a drag so it keeps working outside the tile, my own cursor is drawn locally at once (the remote one only
+ * comes back with the video, a few images later), and anything still held (buttons, keys) is released if the focus is lost.
  */
 function ControlSurface({ video, onInput }: { video: HTMLVideoElement | null; onInput: (ev: RcInput) => void }) {
   const box = useRef<HTMLDivElement>(null);
-  const last = useRef(0);
-  useEffect(() => { box.current?.focus(); }, []);
+  const ghost = useRef<HTMLDivElement>(null);
+  const send = useRef(onInput);
+  send.current = onInput;
+  const queued = useRef<{ x: number; y: number } | null>(null);
+  const frame = useRef(0);
+  const held = useRef(new Map<number, { x: number; y: number }>()); // mouse buttons down, with the last position
+  const keys = useRef(new Map<string, string>()); // physical keys down: code -> key
+
+  const flush = () => {
+    frame.current = 0;
+    const p = queued.current;
+    queued.current = null;
+    if (p) send.current({ k: 'm', ...p });
+  };
+  const releaseAll = () => {
+    held.current.forEach((p, b) => send.current({ k: 'u', b, ...p }));
+    held.current.clear();
+    keys.current.forEach((key, code) => send.current({ k: 'ku', code, key }));
+    keys.current.clear();
+  };
+
+  useEffect(() => {
+    box.current?.focus();
+    return () => { cancelAnimationFrame(frame.current); releaseAll(); };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { // wheel events must be cancelable to stop the page from scrolling: a native, non-passive listener
     const el = box.current;
     if (!el) return;
-    const onWheel = (e: WheelEvent) => { e.preventDefault(); onInput({ k: 'w', dx: e.deltaX, dy: e.deltaY }); };
+    const onWheel = (e: WheelEvent) => { e.preventDefault(); send.current({ k: 'w', dx: e.deltaX, dy: e.deltaY }); };
     el.addEventListener('wheel', onWheel, { passive: false });
     return () => el.removeEventListener('wheel', onWheel);
-  }, [onInput]);
+  }, []);
 
   /** position inside the picture itself (the video is letterboxed when its shape differs from the tile) */
-  const pos = (e: React.MouseEvent) => {
+  const pos = (e: React.PointerEvent) => {
     const r = (video ?? box.current)?.getBoundingClientRect();
     if (!r) return { x: 0, y: 0 };
     const vw = video?.videoWidth || r.width, vh = video?.videoHeight || r.height;
@@ -37,17 +64,77 @@ function ControlSurface({ video, onInput }: { video: HTMLVideoElement | null; on
     const x = (e.clientX - r.left - (r.width - cw) / 2) / cw, y = (e.clientY - r.top - (r.height - ch) / 2) / ch;
     return { x: Math.min(1, Math.max(0, x)), y: Math.min(1, Math.max(0, y)) };
   };
+  const moveGhost = (e: React.PointerEvent) => {
+    const g = ghost.current, r = box.current?.getBoundingClientRect();
+    if (!g || !r) return;
+    g.style.transform = `translate(${e.clientX - r.left}px, ${e.clientY - r.top}px)`;
+    g.style.opacity = '1';
+  };
+  const buttonOf = (e: React.PointerEvent) => (e.button === 0 || e.button === 1 || e.button === 2 ? e.button : -1);
   const key = (down: boolean) => (e: React.KeyboardEvent) => {
     e.preventDefault(); e.stopPropagation();
-    onInput({ k: down ? 'kd' : 'ku', code: e.code, key: e.key });
+    if (down) keys.current.set(e.code, e.key); else keys.current.delete(e.code);
+    send.current({ k: down ? 'kd' : 'ku', code: e.code, key: e.key });
   };
+
   return (
     <div ref={box} className="mcapture" tabIndex={0} role="application" aria-label="remote control"
-      onMouseMove={(e) => { const n = performance.now(); if (n - last.current > 16) { last.current = n; onInput({ k: 'm', ...pos(e) }); } }}
-      onMouseDown={(e) => { e.preventDefault(); box.current?.focus(); onInput({ k: 'd', b: e.button === 2 ? 2 : e.button === 1 ? 1 : 0, ...pos(e) }); }}
-      onMouseUp={(e) => { e.preventDefault(); onInput({ k: 'u', b: e.button === 2 ? 2 : e.button === 1 ? 1 : 0, ...pos(e) }); }}
+      onPointerMove={(e) => {
+        moveGhost(e);
+        queued.current = pos(e);
+        if (!frame.current) frame.current = requestAnimationFrame(flush);
+      }}
+      onPointerDown={(e) => {
+        const b = buttonOf(e);
+        if (b < 0) return;
+        e.preventDefault();
+        box.current?.focus();
+        try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* not capturable */ }
+        const p = pos(e);
+        queued.current = null; // the press carries the position
+        held.current.set(b, p);
+        send.current({ k: 'd', b, ...p });
+      }}
+      onPointerUp={(e) => {
+        const b = buttonOf(e);
+        if (b < 0) return;
+        e.preventDefault();
+        try { e.currentTarget.releasePointerCapture(e.pointerId); } catch { /* already released */ }
+        const p = pos(e);
+        held.current.delete(b);
+        send.current({ k: 'u', b, ...p });
+      }}
+      onPointerLeave={() => { if (ghost.current) ghost.current.style.opacity = '0'; }}
+      onBlur={releaseAll}
       onContextMenu={(e) => e.preventDefault()}
-      onKeyDown={key(true)} onKeyUp={key(false)} />
+      onKeyDown={key(true)} onKeyUp={key(false)}>
+      <div ref={ghost} className="mghost" aria-hidden="true">
+        <svg width="22" height="26" viewBox="0 0 22 26"><path d="M2 2 L2 20 L7 15.5 L10.5 23 L13.5 21.6 L10.2 14.4 L17 14.4 Z" /></svg>
+      </div>
+    </div>
+  );
+}
+
+/** Floating bar on a screen I control: state, full screen, stop. It stays reachable in full screen too. */
+function ControlBar({ tile, onStop }: { tile: HTMLElement | null; onStop?: () => void }) {
+  const [full, setFull] = useState(false);
+  useEffect(() => {
+    const on = () => setFull(!!tile && document.fullscreenElement === tile);
+    document.addEventListener('fullscreenchange', on);
+    return () => { document.removeEventListener('fullscreenchange', on); if (document.fullscreenElement) void document.exitFullscreen().catch(() => undefined); };
+  }, [tile]);
+  const toggle = () => {
+    if (!tile) return;
+    if (document.fullscreenElement === tile) void document.exitFullscreen().catch(() => undefined);
+    else void tile.requestFullscreen().catch(() => undefined);
+  };
+  return (
+    <div className="mrctool" role="toolbar" aria-label={t('meet.rc.live')}>
+      <span className="mrcdot" aria-hidden="true" />
+      <span className="mrclabel">{t('meet.rc.live')}</span>
+      <button type="button" onClick={toggle}>{full ? t('meet.rc.exitFullscreen') : t('meet.rc.fullscreen')}</button>
+      <button type="button" className="stop" onClick={onStop}>{t('meet.rc.stop')}</button>
+    </div>
   );
 }
 
@@ -55,6 +142,7 @@ function Tile({ name, userId, stream, showVideo, micOn, self, screen, fit, ctl }
   name: string; userId: number; stream?: MediaStream | null; showVideo: boolean; micOn: boolean; self?: boolean; screen?: boolean; fit?: 'cover' | 'contain'; ctl?: Control;
 }) {
   const ref = useRef<HTMLVideoElement>(null);
+  const tileRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const v = ref.current;
     if (v && v.srcObject !== (stream ?? null)) {
@@ -63,11 +151,12 @@ function Tile({ name, userId, stream, showVideo, micOn, self, screen, fit, ctl }
     }
   }, [stream]);
   return (
-    <div className={'mtile' + (screen ? ' screen' : '') + (ctl?.mode === 'active' ? ' controlled' : '')} role="group" aria-label={name}>
+    <div ref={tileRef} className={'mtile' + (screen ? ' screen' : '') + (ctl?.mode === 'active' ? ' controlled' : '')} role="group" aria-label={name}>
       {/* the video element stays mounted even when the camera is off, so that the person is still heard */}
       <video ref={ref} autoPlay playsInline muted={!!self} style={{ objectFit: fit ?? 'cover', visibility: showVideo ? 'visible' : 'hidden' }} />
       {!showVideo && <div className="mavatar"><UserAvatar u={{ id: userId, display_name: name }} /></div>}
       {ctl?.mode === 'active' && <ControlSurface video={ref.current} onInput={ctl.onInput} />}
+      {ctl?.mode === 'active' && <ControlBar tile={tileRef.current} onStop={ctl.onStop} />}
       {ctl?.mode === 'unavailable' && <div className="mrchint" role="note">{t('meet.rc.viewerHint')}</div>}
       {ctl && ctl.mode !== 'active' && ctl.mode !== 'unavailable' && (
         <button type="button" className="mrcbtn" disabled={ctl.mode === 'pending'} onClick={ctl.onAsk}>
@@ -110,7 +199,7 @@ export function MeetingRoom() {
   const onInput = (ev: RcInput) => sendInput.current(ev);
   const controlOf = (owner: number, self: boolean): Control | undefined => {
     if (self) return undefined;
-    if (c.controlling === owner) return { mode: 'active', onAsk: () => undefined, onInput };
+    if (c.controlling === owner) return { mode: 'active', onAsk: () => undefined, onInput, onStop: () => c.stopControl() };
     if (c.rcPending === owner) return { mode: 'pending', onAsk: () => undefined, onInput };
     const p = c.peers.get(owner);
     if (p?.rc && c.controlling === null && c.rcPending === null && !c.rcSession) return { mode: 'can', onAsk: () => c.requestControl(owner), onInput };
