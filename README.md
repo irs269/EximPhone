@@ -52,3 +52,11 @@ Service tickets (file for a service, head approves or rejects, then assigns to a
 Internal mail (compose with To/Cc/Bcc, drafts, conversations, attachments, folders, search): see [docs/mail.md](docs/mail.md). External mail (SMTP relay and IMAP mailbox of the existing mail server) is supported and optional: see the settings in that document.
 
 Video meetings (up to 12 people), video calls and screen sharing through an SFU in the media service: see [docs/meetings.md](docs/meetings.md). Remote control of a shared screen (owner uses the desktop app, accepts each time, banner and stop shortcut, audited) is described in the same document.
+
+## Documentation (français)
+
+- [Manuel d'utilisation](docs/fr/manuel-utilisateur.md): pas à pas, avec captures d'écran.
+- [Fonctionnalités](docs/fr/fonctionnalites.md): présentation pour la direction et la DSI, rôles, sécurité, architecture.
+- [Feuille de route](docs/fr/feuille-de-route.md): mise en production, évolutions, et **ce qu'il faut pour envoyer des courriels externes**.
+
+Les PDF (`docs/pdf/`, non versionnés) se génèrent avec `pip install markdown` puis `python scripts/build-docs.py` (Edge ou Chrome requis). Les captures (`docs/img/`) proviennent d'un environnement de démonstration vierge.

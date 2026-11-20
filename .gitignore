@@ -8,3 +8,6 @@ credentials.txt
 ldap-mock/employees.generated.ldif
 downloads/*
 !downloads/.gitkeep
+
+# generated documentation PDFs (python scripts/build-docs.py)
+docs/pdf/
