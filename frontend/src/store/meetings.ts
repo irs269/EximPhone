@@ -145,7 +145,12 @@ export const useMeetings = create<MeetingsState>((set, get) => ({
   async toggleCam() { await client?.setCam(!client.cam); },
   async toggleScreen() {
     if (!client) return;
-    if (client.screen) await client.stopScreen(); else await client.startScreen();
+    if (client.screen) { await client.stopScreen(); return; }
+    if (await client.startScreen() && !client.rcCapable && client.rcReason) {
+      const r = get().room;
+      const key = client.rcReason === 'window' ? 'meet.rc.shareWindow' : client.rcReason === 'driver' ? 'meet.rc.shareDriver' : 'meet.rc.shareBrowser';
+      if (r) set({ room: { ...r, notice: t(key) } });
+    }
   },
 
   onEvent(type, d) {

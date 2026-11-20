@@ -84,6 +84,8 @@ export class MeetingClient {
   rcPending: number | null = null;
   rcSession: { owner: number; controller: number } | null = null;
   rcCapable = false;
+  /** why my share cannot be controlled: 'browser' (not the desktop app), 'window' (not a whole screen), 'driver' (desktop app without input driver) */
+  rcReason: 'browser' | 'window' | 'driver' | null = null;
 
   private ws: WebSocket | null = null;
   private pub: RTCPeerConnection | null = null;
@@ -295,7 +297,15 @@ export class MeetingClient {
     // in the desktop app a whole screen (not a window) can be remote-controlled, if the person later accepts
     const d = desktop();
     this.rcCapable = false;
-    if (d) { try { this.rcCapable = (await d.available()) && (await d.sharedScreen()).controllable; } catch { /* not controllable */ } }
+    this.rcReason = d ? null : 'browser';
+    if (d) {
+      try {
+        const available = await d.available();
+        const controllable = (await d.sharedScreen()).controllable;
+        this.rcCapable = available && controllable;
+        this.rcReason = !available ? 'driver' : !controllable ? 'window' : null;
+      } catch { this.rcReason = 'driver'; }
+    }
     track.onended = () => { void this.stopScreen(); }; // the browser's own "Stop sharing" button
     this.sendState();
     await this.renegotiatePublish();

@@ -160,5 +160,9 @@ export const en: Record<Key, string> = {
   'desk.why': 'It opens without a browser and lets someone take remote control of your screen during a meeting, with your consent each time.',
   'desk.steps': 'After the download, open the file. If Windows shows "Windows protected your PC", click "More info" then "Run anyway". Follow the installer (administrator rights required).',
   'desk.hash': 'SHA-256 fingerprint of the file: {hash}',
+  'meet.rc.viewerHint': 'Remote control unavailable: the person must share a whole screen from the PC application.',
+  'meet.rc.shareBrowser': 'Remote control is not available from the browser. To allow it, share a whole screen from the PC application (profile menu, "PC application").',
+  'meet.rc.shareWindow': 'You are sharing a window: remote control is only possible for a whole screen.',
+  'meet.rc.shareDriver': 'The PC application cannot drive this computer (unsupported system or missing component).',
   'toast.status': 'Status: {s}',
 };

@@ -9,7 +9,7 @@ import { UserAvatar } from './Avatar';
 const mmss = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 
 /** One participant (or one shared screen). The audio of a participant plays from the same stream as their video. */
-type Control = { mode: 'can' | 'pending' | 'active'; onAsk: () => void; onInput: (ev: RcInput) => void };
+type Control = { mode: 'can' | 'pending' | 'active' | 'unavailable'; onAsk: () => void; onInput: (ev: RcInput) => void };
 
 /**
  * Sits on top of a shared screen while I control it: turns my mouse and keyboard into events relative to the shared
@@ -68,7 +68,8 @@ function Tile({ name, userId, stream, showVideo, micOn, self, screen, fit, ctl }
       <video ref={ref} autoPlay playsInline muted={!!self} style={{ objectFit: fit ?? 'cover', visibility: showVideo ? 'visible' : 'hidden' }} />
       {!showVideo && <div className="mavatar"><UserAvatar u={{ id: userId, display_name: name }} /></div>}
       {ctl?.mode === 'active' && <ControlSurface video={ref.current} onInput={ctl.onInput} />}
-      {ctl && ctl.mode !== 'active' && (
+      {ctl?.mode === 'unavailable' && <div className="mrchint" role="note">{t('meet.rc.viewerHint')}</div>}
+      {ctl && ctl.mode !== 'active' && ctl.mode !== 'unavailable' && (
         <button type="button" className="mrcbtn" disabled={ctl.mode === 'pending'} onClick={ctl.onAsk}>
           {ctl.mode === 'pending' ? t('meet.rc.waiting') : t('meet.rc.ask')}
         </button>
@@ -113,6 +114,7 @@ export function MeetingRoom() {
     if (c.rcPending === owner) return { mode: 'pending', onAsk: () => undefined, onInput };
     const p = c.peers.get(owner);
     if (p?.rc && c.controlling === null && c.rcPending === null && !c.rcSession) return { mode: 'can', onAsk: () => c.requestControl(owner), onInput };
+    if (p && !p.rc && c.controlling === null && c.rcPending === null && !c.rcSession) return { mode: 'unavailable', onAsk: () => undefined, onInput };
     return undefined;
   };
   const peers = [...c.peers.values()];

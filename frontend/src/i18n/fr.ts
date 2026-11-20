@@ -157,6 +157,10 @@ export const fr = {
   'desk.why': "Elle s'ouvre sans navigateur et permet la prise en main à distance de votre écran pendant une réunion, avec votre accord à chaque fois.",
   'desk.steps': "Après le téléchargement, ouvrez le fichier. Si Windows affiche « Windows a protégé votre ordinateur », cliquez sur « Informations complémentaires » puis « Exécuter quand même ». Suivez l'assistant (droits administrateur requis).",
   'desk.hash': 'Empreinte SHA-256 du fichier : {hash}',
+  'meet.rc.viewerHint': "Prise en main indisponible : la personne doit partager un écran entier depuis l'application PC.",
+  'meet.rc.shareBrowser': "Prise en main à distance indisponible depuis le navigateur. Pour l'autoriser, partagez un écran entier depuis l'application PC (menu du profil, « Application PC »).",
+  'meet.rc.shareWindow': "Vous partagez une fenêtre : la prise en main à distance n'est possible que pour un écran entier.",
+  'meet.rc.shareDriver': "L'application PC ne peut pas piloter cet ordinateur (système non pris en charge ou composant manquant).",
   'toast.status': 'Statut : {s}',
 } as const;
 export type Key = keyof typeof fr;

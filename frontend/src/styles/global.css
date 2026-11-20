@@ -351,3 +351,6 @@ button.it{width:100%;text-align:left;font:inherit;color:inherit}
 .dsk.compact b{font-size:13px}
 .dsk.compact{display:grid;grid-template-columns:26px 1fr;gap:6px 10px;align-items:start}
 .dsk.compact .btn{grid-column:1/-1;text-align:center;width:100%;box-sizing:border-box}
+
+.mrchint{position:absolute;left:50%;bottom:48px;transform:translateX(-50%);max-width:80%;background:var(--scrim);color:var(--surface);border-radius:10px;padding:7px 12px;font-size:12.5px;text-align:center;opacity:0;transition:opacity .15s;pointer-events:none}
+.mtile:hover .mrchint{opacity:1}
