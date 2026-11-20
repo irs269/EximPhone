@@ -39,7 +39,7 @@ if ($PinServerCertificate) {
 
 # 2. copy the sources to the short build folder (node_modules and dist stay there between runs)
 New-Item -ItemType Directory -Force -Path $work | Out-Null
-$files = 'main.js', 'offline.html', 'preload.js', 'ui-preload.js', 'remote.js', 'keymap.js', 'winDriver.js', 'picker.html', 'banner.html', 'package.json', 'package-lock.json'
+$files = 'main.js', 'offline.html', 'preload.js', 'ui-preload.js', 'remote.js', 'keymap.js', 'winDriver.js', 'picker.html', 'banner.html', 'icon.png', 'package.json', 'package-lock.json'
 foreach ($f in $files) { Copy-Item -Force (Join-Path $src $f) (Join-Path $work $f) }
 [System.IO.File]::WriteAllText((Join-Path $work 'defaults.json'), ($defaults | ConvertTo-Json), (New-Object System.Text.UTF8Encoding($false)))
 

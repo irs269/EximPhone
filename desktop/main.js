@@ -50,7 +50,7 @@ async function pickSource(parent) {
   return new Promise((resolve) => {
     const picker = new BrowserWindow({
       parent, modal: true, width: 820, height: 580, resizable: false, minimizable: false, maximizable: false, autoHideMenuBar: true,
-      title: tr('Partager', 'Share'), backgroundColor: '#F4F6FA',
+      title: tr('Partager', 'Share'), backgroundColor: '#F4F6FA', icon: path.join(__dirname, 'icon.png'),
       webPreferences: { preload: path.join(__dirname, 'ui-preload.js'), contextIsolation: true, nodeIntegration: false, sandbox: true },
     });
     let done = false;
@@ -150,7 +150,7 @@ function createWindow(url) {
   origin = new URL(url).origin;
   const win = new BrowserWindow({
     width: 1280, height: 800, minWidth: 900, minHeight: 600,
-    title: 'Exim Connect', backgroundColor: '#F4F6FA', show: false,
+    title: 'Exim Connect', backgroundColor: '#F4F6FA', show: false, icon: path.join(__dirname, 'icon.png'),
     webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, nodeIntegration: false, sandbox: true, webSecurity: true },
   });
   mainWin = win;

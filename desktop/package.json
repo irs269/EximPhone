@@ -27,7 +27,8 @@
       "winDriver.js",
       "picker.html",
       "banner.html",
-      "defaults.json"
+      "defaults.json",
+      "icon.png"
     ],
     "win": {
       "target": "nsis"
@@ -39,7 +40,8 @@
     },
     "asarUnpack": [
       "node_modules/koffi/**"
-    ]
+    ],
+    "icon": "icon.png"
   },
   "dependencies": {
     "koffi": "^3.3.8"
