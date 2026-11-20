@@ -238,7 +238,7 @@ Un **ticket** est une demande adressée à un service (informatique, RH, finance
 
 ![Liste des tickets](../img/16-tickets.png)
 
-Le menu de la liste : **Tous**, **Mes tickets**, **À faire** (ce que vous devez traiter ou valider), **Mon service**. Les étiquettes de couleur donnent l'état : *À valider, Approuvé, Assigné, En cours, Résolu, Refusé, Annulé*.
+Le menu de la liste : **Tous**, **Mes tickets**, **À faire** (ce que vous devez traiter ou valider), **Mon service**. Les étiquettes de couleur donnent l'état : *À valider, Approuvé · à assigner, Assigné, En cours, Résolu, Refusé, Annulé*.
 
 ### Faire une demande
 
@@ -260,7 +260,7 @@ Ouvrez un ticket **À valider** :
 
 ### Si on vous assigne un ticket
 
-Ouvrez-le : **Démarrer** (état *En cours*), puis **Résoudre** avec un commentaire quand c'est fait. Un responsable peut **réassigner** un ticket en cours.
+Ouvrez-le : **Prendre en charge** (état *En cours*), puis **Marquer comme résolu** avec un commentaire quand c'est fait. Le demandeur peut **annuler** son ticket tant qu'il n'est pas traité, et un responsable peut **réassigner** un ticket en cours.
 
 ---
 

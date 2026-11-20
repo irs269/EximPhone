@@ -53,10 +53,12 @@ Internal mail (compose with To/Cc/Bcc, drafts, conversations, attachments, folde
 
 Video meetings (up to 12 people), video calls and screen sharing through an SFU in the media service: see [docs/meetings.md](docs/meetings.md). Remote control of a shared screen (owner uses the desktop app, accepts each time, banner and stop shortcut, audited) is described in the same document.
 
-## Documentation (français)
+## Documentation
 
-- [Manuel d'utilisation](docs/fr/manuel-utilisateur.md): pas à pas, avec captures d'écran.
-- [Fonctionnalités](docs/fr/fonctionnalites.md): présentation pour la direction et la DSI, rôles, sécurité, architecture.
-- [Feuille de route](docs/fr/feuille-de-route.md): mise en production, évolutions, et **ce qu'il faut pour envoyer des courriels externes**.
+| | Français | English |
+|---|---|---|
+| User manual (with screenshots) | [docs/fr/manuel-utilisateur.md](docs/fr/manuel-utilisateur.md) | [docs/en/user-manual.md](docs/en/user-manual.md) |
+| Features (management, IT) | [docs/fr/fonctionnalites.md](docs/fr/fonctionnalites.md) | [docs/en/features.md](docs/en/features.md) |
+| Roadmap and what is needed to send external e-mail | [docs/fr/feuille-de-route.md](docs/fr/feuille-de-route.md) | [docs/en/roadmap.md](docs/en/roadmap.md) |
 
-Les PDF (`docs/pdf/`, non versionnés) se génèrent avec `pip install markdown` puis `python scripts/build-docs.py` (Edge ou Chrome requis). Les captures (`docs/img/`) proviennent d'un environnement de démonstration vierge.
+The PDFs (`docs/pdf/fr`, `docs/pdf/en`, not versioned) are generated with `pip install markdown` then `python scripts/build-docs.py` (Edge or Chrome required). The screenshots (`docs/img` in French, `docs/img-en` in English) come from a clean demonstration environment.
