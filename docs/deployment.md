@@ -94,6 +94,8 @@ sh scripts/deploy-test.sh <vps-public-ip>
 
 The script generates fresh secrets (`.env`), a mock directory with a random password per account (`credentials.txt`), a self-signed certificate for the IP, and starts the stack with `docker-compose.test.yml`. **In the test phase there is no IP restriction**: `ENFORCE_SITE_NETWORK=false` in that file switches off the rule "clock-in only from the site's IP ranges", so testers can sign in from any network. Production keeps the rule (default `true`): set the real ranges of each site and never copy this setting into `docker-compose.prod.yml`. Open the firewall as listed in the Firewall section (443/tcp and the UDP ranges are enough without desk phones). Delete `credentials.txt` and tear down with `docker compose -f docker-compose.yml -f docker-compose.test.yml down -v` when the trial ends.
 
+To get a ready-made set of test accounts (1 HR, 1 manager and 2 employees of the manager's service), run `sh scripts/setup-test-users.sh` on the server: it reads `credentials.txt`, creates the accounts and sets their roles and reporting line, and prints the logins and passwords. It is safe to run again.
+
 If port 443 is already used on the server (another web server), publish Exim Connect elsewhere: add `HTTPS_PORT=8443` to `.env` and open that port; the application is then at `https://<ip>:8443`.
 
 ## Heads of service (tickets)
