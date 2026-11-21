@@ -41,7 +41,7 @@
 | | golang-jwt | 5.2 | access tokens |
 | | go-ldap | 3.4 | Active Directory / LDAP |
 | | minio-go | 7.0 | S3 client (object store) |
-| | excelize | 2.8 | Excel export (payroll) |
+| | excelize | 2.8 | Excel export (attendance) |
 | | go-imap / go-message | 1.2 / 0.18 | incoming and outgoing external mail |
 | **Telephony** | sipgo | 0.27 | SIP registrar and call control |
 | **Media** | pion/webrtc | 4.0 | WebRTC, SFU for meetings |

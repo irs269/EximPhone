@@ -33,7 +33,7 @@ Nine needs are covered in the same interface: **attendance, instant messaging, m
 | **Directory** | colleagues by department, extension, site, real-time status |
 | **Announcements** | memos, urgent announcements with acknowledgement |
 | **Tickets** | requests to services, approval by the head, assignment, follow-up |
-| **Team / HR** | dashboards, approvals, corrections, payroll export |
+| **Team / HR** | dashboards, approvals, corrections, monthly attendance export |
 | **Audit** | tamper-proof traceability log |
 | **PC application** | one-click install from the site, secure remote control |
 
@@ -131,7 +131,7 @@ Complete workflow: **request → approval by the head of the service → assignm
 - **Present, late, absent** by site and by department, in real time.
 - A **manager** sees their team; **HR** sees the whole bank.
 - **Approval of early departures**, **justified attendance corrections** (the previous value is kept).
-- **Monthly payroll export**: Excel (detail and per-employee summary) and CSV; protected against formula injection.
+- **Monthly attendance export**: Excel (detail and per-employee summary) and CSV; protected against formula injection.
 
 ### 3.10 Audit and traceability
 
@@ -156,7 +156,7 @@ Every user is an **employee**. Other roles are granted by the **IT administrator
 |---|---|
 | **Employee** | clock in, write, call, meetings, mail, tickets, read and acknowledge announcements |
 | **Manager** | see their team, approve their team's early departures |
-| **HR** | see everybody, approve early departures, correct clock-ins, export payroll, follow announcement read receipts |
+| **HR** | see everybody, approve early departures, correct clock-ins, export the month's attendance, follow announcement read receipts |
 | **Communication / Management** | publish announcements and follow who has read them |
 | **Head of service** | approve or reject their service's tickets, assign them |
 | **IT administrator** | manage roles, managers, sites (IP ranges, hours, tolerance), phones |

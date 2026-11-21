@@ -33,7 +33,7 @@ Neuf besoins sont couverts dans la même interface : **pointage, messagerie inst
 | **Annuaire** | collègues par service, poste, site, statut en temps réel |
 | **Annonces** | notes de service, annonces urgentes avec accusé de réception |
 | **Tickets** | demandes aux services, validation par le responsable, affectation, suivi |
-| **Équipe / RH** | tableaux de bord, validations, corrections, export de paie |
+| **Équipe / RH** | tableaux de bord, validations, corrections, export mensuel des présences |
 | **Audit** | journal de traçabilité inaltérable |
 | **Application PC** | installation en un clic depuis le site, prise de contrôle sécurisée |
 
@@ -131,7 +131,7 @@ Circuit complet : **demande → validation par le responsable du service → aff
 - **Présents, retards, absents** par site et par service, en temps réel.
 - Le **manager** voit son équipe ; les **RH** voient toute la banque.
 - **Validation des départs anticipés**, **corrections de pointage justifiées** (l'ancienne valeur est conservée).
-- **Export mensuel de paie** : Excel (détail et synthèse par employé) et CSV ; protégé contre l'injection de formules.
+- **Export mensuel des présences** : Excel (détail et synthèse par employé) et CSV ; protégé contre l'injection de formules.
 
 ### 3.10 Audit et traçabilité
 
@@ -156,7 +156,7 @@ Tout utilisateur est **employé**. Les autres rôles sont attribués par l'**adm
 |---|---|
 | **Employé** | pointer, écrire, appeler, réunions, courrier, tickets, lire et accuser les annonces |
 | **Manager** | voir son équipe, valider les départs anticipés de son équipe |
-| **RH** | voir tout le monde, valider les départs anticipés, corriger des pointages, exporter la paie, suivre la lecture des annonces |
+| **RH** | voir tout le monde, valider les départs anticipés, corriger des pointages, exporter les présences du mois, suivre la lecture des annonces |
 | **Communication / Direction** | publier des annonces et suivre qui les a lues |
 | **Responsable de service** | approuver ou refuser les tickets de son service, les assigner |
 | **Administrateur IT** | gérer rôles, managers, sites (plages IP, horaires, tolérance), téléphones |
