@@ -389,19 +389,19 @@ Twelve forward-only migrations (`db/migrations/000001_init` … `000012_meetings
 ```mermaid
 flowchart LR
   dev["Development<br/>make dev<br/>self-signed cert, mock LDAP, GreenMail"]
-  test["Test (VPS)<br/>deploy-test.sh<br/>test certificate, mock directory, IP-restricted"]
+  test["Test (VPS)<br/>deploy-test.sh<br/>test certificate, mock directory, no IP rule"]
   prod["Production<br/>docker-compose.prod.yml<br/>bank CA certificate, real AD, real mail"]
   dev -->|"push + CI green"| test -->|"acceptance + sign-off"| prod
 ```
 
 | | Development | Test (VPS) | Production |
 |---|---|---|---|
-| Start | `make dev` | `sh scripts/deploy-test.sh <ip> <cidr>` | `docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build --wait` |
+| Start | `make dev` | `sh scripts/deploy-test.sh <ip>` | `docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build --wait` |
 | Compose files | base + `dev` | base + `test` | base + `prod` |
 | Directory | `ldap-mock` (20 demo users) | `ldap-mock` (generated passwords) | bank Active Directory over LDAPS |
 | Mail | GreenMail | none / relay if provided | bank SMTP relay + IMAP mailbox |
 | Certificate | self-signed (`make certs`) | self-signed or public | bank internal CA |
-| Network rule | local ranges | testers' public IPs only | real branch ranges |
+| Network rule | local ranges | **none** (`ENFORCE_SITE_NETWORK=false`, testers connect from anywhere) | real branch ranges, rule on |
 | Secrets | `.env.example` values | `gen-env.sh` random values | vault, replaced before start |
 
 The **PC application** is built with `scripts/build-desktop.ps1 -Url <server>` (optionally `-PinServerCertificate` for a self-signed test server) and published to `downloads/` with a `manifest.json` (version, size, SHA-256); the site offers it from the profile menu and the Help page.

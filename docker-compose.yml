@@ -50,6 +50,8 @@ services:
       REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
       JWT_SECRET: ${JWT_SECRET}
       MESSAGE_KEY: ${MESSAGE_KEY}
+      # clock-in only from a site's IP ranges; "false" switches the rule off (test phases only, see docker-compose.test.yml)
+      ENFORCE_SITE_NETWORK: ${ENFORCE_SITE_NETWORK:-true}
       # external mail (optional, empty = disabled): see docs/mail.md
       MAIL_SMTP_HOST: ${MAIL_SMTP_HOST:-}
       MAIL_SMTP_PORT: ${MAIL_SMTP_PORT:-}

@@ -389,19 +389,19 @@ Douze migrations en avant seulement (`db/migrations/000001_init` … `000012_mee
 ```mermaid
 flowchart LR
   dev["Développement<br/>make dev<br/>certificat auto-signé, LDAP simulé, GreenMail"]
-  test["Test (VPS)<br/>deploy-test.sh<br/>certificat de test, annuaire simulé, IP restreintes"]
+  test["Test (VPS)<br/>deploy-test.sh<br/>certificat de test, annuaire simulé, sans règle IP"]
   prod["Production<br/>docker-compose.prod.yml<br/>certificat de l'AC de la banque, vrai AD, vraie messagerie"]
   dev -->|"push + CI verte"| test -->|"recette + validation"| prod
 ```
 
 | | Développement | Test (VPS) | Production |
 |---|---|---|---|
-| Démarrage | `make dev` | `sh scripts/deploy-test.sh <ip> <cidr>` | `docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build --wait` |
+| Démarrage | `make dev` | `sh scripts/deploy-test.sh <ip>` | `docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build --wait` |
 | Fichiers compose | base + `dev` | base + `test` | base + `prod` |
 | Annuaire | `ldap-mock` (20 utilisateurs de démonstration) | `ldap-mock` (mots de passe générés) | Active Directory de la banque en LDAPS |
 | Courrier | GreenMail | aucun / relais si fourni | relais SMTP + boîte IMAP de la banque |
 | Certificat | auto-signé (`make certs`) | auto-signé ou public | autorité interne de la banque |
-| Règle réseau | plages locales | IP publiques des testeurs uniquement | vraies plages des agences |
+| Règle réseau | plages locales | **aucune** (`ENFORCE_SITE_NETWORK=false`, les testeurs se connectent de n'importe où) | vraies plages des agences, règle active |
 | Secrets | valeurs de `.env.example` | valeurs aléatoires de `gen-env.sh` | coffre-fort, remplacés avant le démarrage |
 
 L'**application PC** se construit avec `scripts/build-desktop.ps1 -Url <serveur>` (avec `-PinServerCertificate` pour un serveur de test auto-signé) et se publie dans `downloads/` avec un `manifest.json` (version, taille, SHA-256) ; le site la propose depuis le menu du profil et la page Aide.

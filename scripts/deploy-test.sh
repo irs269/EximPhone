@@ -1,14 +1,13 @@
 #!/bin/sh
 # Test deployment on a fresh VPS (Linux, Docker + Compose v2, openssl): fresh random secrets, a mock
 # directory with generated passwords, a self-signed certificate for the server IP, then the stack.
-# Usage: sh scripts/deploy-test.sh <public-ip> <tester-cidr>[,<tester-cidr>...]
-#   tester-cidr: public address(es) the testers browse from, e.g. 41.77.1.2/32. Login is clock-in and is only
-#   allowed from a site's IP ranges, so these REPLACE the development ranges of every site.
+# Usage: sh scripts/deploy-test.sh <public-ip>
+#   Test phase: login (clock-in) is NOT restricted by IP address (ENFORCE_SITE_NETWORK=false in docker-compose.test.yml),
+#   so testers can connect from anywhere. Production keeps the rule: see docs/deployment.md.
 # Refuses to overwrite an existing .env. Credentials of the test accounts go to credentials.txt (mode 600).
 set -eu
 cd "$(dirname "$0")/.."
-IP="${1:?usage: deploy-test.sh <public-ip> <tester-cidr>[,...]}"
-CIDRS="${2:?give the testers public IP(s) as CIDR, e.g. 41.77.1.2/32}"
+IP="${1:?usage: deploy-test.sh <public-ip>}"
 if [ -e .env ]; then echo ".env already exists: move it away first" >&2; exit 1; fi
 command -v docker >/dev/null || { echo "docker is required" >&2; exit 1; }
 command -v openssl >/dev/null || { echo "openssl is required" >&2; exit 1; }
@@ -68,10 +67,7 @@ chmod 644 nginx/certs/server.key nginx/certs/server.crt
 
 # 4. start
 docker compose -f docker-compose.yml -f docker-compose.test.yml up -d --build --wait
-# 5. allowed client networks for the sites (the migration ships development ranges)
-SQL_RANGES="$(echo "$CIDRS" | sed "s/,/','/g")"
-set -a; . ./.env; set +a
-docker compose -f docker-compose.yml -f docker-compose.test.yml exec -T postgres psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v ON_ERROR_STOP=1 -q   -c "UPDATE sites SET ip_ranges = ARRAY['$SQL_RANGES']::cidr[]"
+# 5. nothing to do for the client networks: the test stack does not apply the IP rule of the sites
 echo
 echo "Exim Connect is up: https://$IP  (accept the self-signed certificate)"
 echo "Test accounts and passwords: credentials.txt  (asaid is the IT administrator)"

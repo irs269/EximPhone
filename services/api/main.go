@@ -86,6 +86,8 @@ func main() {
 		s3:        s3,
 		jwtSecret: []byte(secret),
 		now:       func() time.Time { return time.Now().UTC() },
+		// the network rule is on by default; only an explicit "false" switches it off (test deployments)
+		enforceNetwork: os.Getenv("ENFORCE_SITE_NETWORK") != "false",
 		ldap: directory.Client{
 			URL: env("LDAP_URL"), BaseDN: env("LDAP_BASE_DN"), UserAttr: env("LDAP_USER_ATTR"),
 			BindDN: env("LDAP_BIND_DN"), BindPassword: env("LDAP_BIND_PASSWORD"),

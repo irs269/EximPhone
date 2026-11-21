@@ -47,7 +47,7 @@ Neuf besoins sont couverts dans la même interface : **pointage, messagerie inst
 
 - **Authentification par l'annuaire** d'entreprise (Active Directory / LDAP) : pas de nouveau mot de passe.
 - **La connexion vaut pointage d'arrivée**, et la déconnexion pointage de départ, après une fenêtre de confirmation.
-- **Contrôle du réseau** : le pointage n'est accepté que depuis les **plages d'adresses de l'agence** de l'employé (configurables par site).
+- **Contrôle du réseau** : le pointage n'est accepté que depuis les **plages d'adresses de l'agence** de l'employé (configurables par site ; désactivé pendant la phase de test).
 - **Retard** : arrivée après l'heure de début + tolérance (par défaut 8 h 00 + 15 min).
 - **Départ anticipé** : avant l'heure de fin (par défaut 17 h 00), un **motif obligatoire** est demandé et validé par le responsable.
 - **Oubli de départ** : la journée est clôturée automatiquement à minuit, avec l'heure de la dernière activité, et signalée au responsable.

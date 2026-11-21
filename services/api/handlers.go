@@ -46,6 +46,8 @@ type app struct {
 	s3        *minio.Client
 	jwtSecret []byte
 	now       func() time.Time
+	// enforceNetwork: clock-in only from a site's IP ranges (ENFORCE_SITE_NETWORK, on unless set to "false"; off only for test phases)
+	enforceNetwork bool
 }
 
 func (a *app) routes(r chi.Router) {
@@ -215,7 +217,7 @@ func (a *app) login(w http.ResponseWriter, r *http.Request) {
 		apiError(w, http.StatusForbidden, "no work site assigned to this account")
 		return
 	}
-	if !attendance.IPAllowed(ip, st.Ranges) {
+	if a.enforceNetwork && !attendance.IPAllowed(ip, st.Ranges) {
 		a.st.audit(ctx, &u.ID, u.Username, "login_denied_network", ip, nil)
 		apiError(w, http.StatusForbidden, "clock-in is only possible from the Exim Bank internal network")
 		return

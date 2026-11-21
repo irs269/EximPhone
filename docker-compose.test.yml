@@ -21,3 +21,6 @@ services:
   api:
     depends_on:
       ldap-mock: {condition: service_healthy}
+    environment:
+      # test phase: testers connect from any network, so the IP rule of the sites is off (production keeps it on)
+      ENFORCE_SITE_NETWORK: "false"

@@ -47,7 +47,7 @@ Nine needs are covered in the same interface: **attendance, instant messaging, m
 
 - **Authentication through the corporate directory** (Active Directory / LDAP): no new password.
 - **Signing in is the arrival clock-in**, and signing out is the departure clock-in, after a confirmation window.
-- **Network check**: clocking in is only accepted from the **IP ranges of the employee's branch** (configurable per site).
+- **Network check**: clocking in is only accepted from the **IP ranges of the employee's branch** (configurable per site; switched off during the test phase).
 - **Lateness**: arrival after start time + tolerance (default 08:00 + 15 min).
 - **Early departure**: before the end time (default 17:00) a **mandatory reason** is requested and approved by the manager.
 - **Forgotten clock-out**: the day is closed automatically at midnight, with the time of the last activity, and reported to the manager.
