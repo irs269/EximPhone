@@ -3,6 +3,9 @@ import { useApp } from '../store/app';
 import { t } from '../i18n';
 import { LangSwitch } from '../components/LangSwitch';
 
+type DesktopBridge = { signInWithBrowser?: () => void };
+const bridge = () => (window as unknown as { eximDesktop?: DesktopBridge }).eximDesktop;
+
 export function Login() {
   const { login, loginError } = useApp();
   const [username, setUsername] = useState('');
@@ -38,6 +41,12 @@ export function Login() {
         <input id="pwd" className="inp" type="password" autoComplete="current-password" required value={password} onChange={(e) => setPassword(e.target.value)} />
         {loginError && <div className="err" role="alert">{loginError}</div>}
         <button className="btn" type="submit" disabled={busy}>{busy ? t('login.busy') : t('login.submit')}</button>
+        {bridge()?.signInWithBrowser && (
+          <>
+            <button className="btn ghost" type="button" onClick={() => bridge()?.signInWithBrowser?.()}>{t('login.browser')}</button>
+            <div className="note">{t('login.browserHint')}</div>
+          </>
+        )}
         <div className="note">{t('login.note')}</div>
       </form>
     </div>

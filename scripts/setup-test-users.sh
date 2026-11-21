@@ -1,9 +1,11 @@
 #!/bin/sh
-# Test phase: sets up 4 ready-to-use accounts on the test server (idempotent, safe to run again):
+# Test phase: sets up 6 ready-to-use accounts on the test server (idempotent, safe to run again):
 #   mjuma     Mariam Juma     HR              role "hr"      sees everybody, validates, corrects, exports
 #   oabdallah Omar Abdallah   Operations       role "manager" sees his team, validates its early departures
 #   snassor   Salma Nassor    Operations       employee of Omar's team
 #   imwinyi   Issa Mwinyi     Operations       employee of Omar's team
+#   imoussa   Idrissa Moussa  Communication    role "communication"  publishes announcements, follows who read them
+#   hkhamis   Hamad Khamis    Finance          role "direction"      publishes announcements, follows who read them
 # Needs credentials.txt (written by deploy-test.sh) with the IT administrator "asaid", curl and python3.
 # Usage: sh scripts/setup-test-users.sh
 # Optional: CREDENTIALS=<file> and API_BASE=https://host:port/api to target another installation.
@@ -38,13 +40,15 @@ field() { python3 -c 'import sys, json; d = json.load(sys.stdin); print(eval(sys
 # id_of <user>: signs in (which creates the account on its first login) and prints the user id
 id_of() { J="$(login "$1")" || exit 1; printf '%s' "$J" | field 'd["user"]["id"]'; }
 
-echo "Signing in the administrator and the 4 accounts (this also creates the accounts)..."
+echo "Signing in the administrator and the 6 accounts (this also creates the accounts)..."
 AJ="$(login asaid)" || exit 1
 ADMIN="$(printf '%s' "$AJ" | field 'd["access_token"]')"
 ID_HR="$(id_of mjuma)" || exit 1
 ID_MGR="$(id_of oabdallah)" || exit 1
 ID_E1="$(id_of snassor)" || exit 1
 ID_E2="$(id_of imwinyi)" || exit 1
+ID_COM="$(id_of imoussa)" || exit 1
+ID_DIR="$(id_of hkhamis)" || exit 1
 
 put() { # put <path> <json> <label>
   code="$(curl -sk -o /dev/null -w '%{http_code}' -X PUT "$API_BASE$1" -H "Authorization: Bearer $ADMIN" -H 'Content-Type: application/json' -d "$2")"
@@ -52,15 +56,20 @@ put() { # put <path> <json> <label>
 }
 put "/admin/users/$ID_HR/roles" '{"roles":["hr"]}' "mjuma = HR"
 put "/admin/users/$ID_MGR/roles" '{"roles":["manager"]}' "oabdallah = manager"
+put "/admin/users/$ID_COM/roles" '{"roles":["communication"]}' "imoussa = communication"
+put "/admin/users/$ID_DIR/roles" '{"roles":["direction"]}' "hkhamis = direction"
 put "/admin/users/$ID_E1/manager" "{\"manager_id\":$ID_MGR}" "snassor reports to oabdallah"
 put "/admin/users/$ID_E2/manager" "{\"manager_id\":$ID_MGR}" "imwinyi reports to oabdallah"
 
 echo
 echo "Accounts ready (sign in at the address of the test server):"
-printf '  %-10s %-16s %-28s %s\n' "username" "name" "role" "password"
-printf '  %-10s %-16s %-28s %s\n' mjuma "Mariam Juma" "HR" "$(pw mjuma)"
-printf '  %-10s %-16s %-28s %s\n' oabdallah "Omar Abdallah" "Manager (Operations)" "$(pw oabdallah)"
-printf '  %-10s %-16s %-28s %s\n' snassor "Salma Nassor" "Employee of Omar's team" "$(pw snassor)"
-printf '  %-10s %-16s %-28s %s\n' imwinyi "Issa Mwinyi" "Employee of Omar's team" "$(pw imwinyi)"
+printf '  %-10s %-16s %-31s %s\n' "username" "name" "role" "password"
+printf '  %-10s %-16s %-31s %s\n' mjuma "Mariam Juma" "HR" "$(pw mjuma)"
+printf '  %-10s %-16s %-31s %s\n' oabdallah "Omar Abdallah" "Manager (Operations)" "$(pw oabdallah)"
+printf '  %-10s %-16s %-31s %s\n' snassor "Salma Nassor" "Employee of Omar's team" "$(pw snassor)"
+printf '  %-10s %-16s %-31s %s\n' imwinyi "Issa Mwinyi" "Employee of Omar's team" "$(pw imwinyi)"
+printf '  %-10s %-16s %-31s %s\n' imoussa "Idrissa Moussa" "Communication (announcements)" "$(pw imoussa)"
+printf '  %-10s %-16s %-31s %s\n' hkhamis "Hamad Khamis" "Direction (announcements)" "$(pw hkhamis)"
 echo
-echo "HR and the manager see the \"Team\" screen after signing in. Delete credentials.txt when the trial ends."
+echo "HR and the manager see the \"Team\" screen; Communication and Direction see the \"New announcement\" button (Announcements page)."
+echo "Delete credentials.txt when the trial ends."

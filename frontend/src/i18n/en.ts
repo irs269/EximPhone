@@ -162,6 +162,8 @@ export const en: Record<Key, string> = {
   'desk.hash': 'SHA-256 fingerprint of the file: {hash}',
   'meet.rc.viewerHint': 'Remote control unavailable: the person must share a whole screen from the PC application.',
   'meet.rc.shareBrowser': 'Remote control is not available from the browser. To allow it, share a whole screen from the PC application (profile menu, "PC application").',
+  'desk.open': 'Open in the PC application', 'desk.openHint': 'Already installed? It opens with your current session, without typing the password again.',
+  'login.browser': 'Sign in with my browser', 'login.browserHint': 'If you are already signed in on the site, you will be signed in here without a password.', 'err.desktopCode': 'The sign-in link has expired. Open the application again from the site, or enter your password.',
   'meet.rc.live': 'Remote control active', 'meet.rc.fullscreen': 'Full screen', 'meet.rc.exitFullscreen': 'Exit full screen',
   'meet.rc.shareReady': 'Remote control: ready (whole screen, PC application). Other participants can ask for it.',
   'meet.rc.shareWindow': 'You are sharing a window: remote control is only possible for a whole screen.',

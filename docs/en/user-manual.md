@@ -13,6 +13,16 @@ Exim Connect can be used in two ways, with the same account:
 - **in a web browser** (Chrome, Edge…), at the address given by IT;
 - **with the PC application** (Windows), which opens like any other program. It is **required for remote control** (see § 5.5). To install it: your profile menu (bottom left) → **Download and install**, or the **Help** page.
 
+### 1.1 bis Being signed in automatically in the PC application
+
+You **do not need to type your password again** in the PC application if you are already signed in on the site:
+
+- **From the site**: in the profile menu or on the **Help** page, click **Open in the PC application**. Windows may ask permission to open Exim Connect: accept. The application opens with your session.
+- **From the application**: on its sign-in screen, click **Sign in with my browser**. The browser opens; if you are already signed in there, you come back to the application signed in.
+- **Right after installing**: the very first time the application starts, the browser opens once to do this automatically.
+
+This does **not create a new clock-in**: your arrival stays the one of your first sign-in of the day. If you clocked out in the meantime, you must type your password again.
+
 ### 1.2 Signing in
 
 ![Sign-in page](../img-en/01-connexion.png)

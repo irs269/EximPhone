@@ -70,7 +70,7 @@
 | Mail | SMTP (STARTTLS / TLS), IMAP, MIME (UTF-8) |
 | Encryption at rest | AES-256-GCM (messages, mail, attachments, recordings, SIP secrets) |
 | Backups | AES-256 with PBKDF2-derived key |
-| Tokens | JWT (15-minute access token, HttpOnly refresh cookie; 2-minute meeting token) |
+| Tokens | JWT (15-minute access token, HttpOnly refresh cookie; 2-minute meeting token; 60-second single-use sign-in code for the PC application) |
 
 ---
 
@@ -183,6 +183,29 @@ sequenceDiagram
 ```
 
 Passwords are never stored: Active Directory is the only authority.
+
+### 4.1 bis Automatic sign-in of the PC application (one-time code)
+
+```mermaid
+sequenceDiagram
+  participant W as Site (browser, signed in)
+  participant A as api
+  participant R as Redis
+  participant OS as Windows
+  participant D as PC application
+  W->>A: POST /auth/desktop-code (open session)
+  A->>R: SET dc:hash(code) = user, 60 s
+  A-->>W: code (43 characters, 256 bits)
+  W->>OS: opens eximconnect://signin?code=...
+  OS->>D: starts or notifies the application (second-instance)
+  D->>A: loads the site on ITS OWN configured address with ?desktop_code=...
+  A->>R: GETDEL (single use)
+  A->>A: active user? work day open?
+  A-->>D: access token + HttpOnly refresh cookie
+  Note over A,D: no new clock-in; every failure answers 401 without detail
+```
+
+The link carries **only** the code; the server address always comes from the application's own settings, never from the link. The code is stored hashed, lasts 60 seconds and works once. The reverse direction exists: the application opens the browser on `/?desktop_login=1`, and the site, once signed in, hands the session back to the application through the same mechanism.
 
 ### 4.2 Real-time events (chat, mail, tickets, announcements)
 
@@ -416,8 +439,8 @@ The **PC application** is built with `scripts/build-desktop.ps1 -Url <server>` (
 |---|---|---|---|
 | Unit (Go) | `go test -race` | 16 test files | attendance rules, crypto, SIP auth, SFU and remote-control logic, mail parsing |
 | Unit (web) | Vitest | 8 tests | helpers, translations, brand tokens |
-| Unit (desktop) | Node test runner | 15 tests | remote-control rules, key mapping |
-| End to end | Node scripts against the real stack | 232 checks | `realtime` 22, `calls` 23, `hr` 36, `tickets` 35, `mail` 54, `mail-external` 22, `meetings` 40 |
+| Unit (desktop) | Node test runner | 19 tests | remote-control rules, key mapping |
+| End to end | Node scripts against the real stack | 242 checks | `realtime` 22, `calls` 23, `hr` 36, `tickets` 35, `mail` 54, `mail-external` 22, `meetings` 40, `desktop-signin` 10 |
 | Load | `scripts/load-test.sh`, `services/e2e` load tests | on demand | concurrent logins, messages, phone legs |
 | Security | Trivy (`scripts/scan.sh`, CI) | per image | known vulnerabilities (CRITICAL blocks the build) |
 

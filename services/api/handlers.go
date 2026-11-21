@@ -53,6 +53,7 @@ type app struct {
 func (a *app) routes(r chi.Router) {
 	r.Post("/auth/login", a.login)
 	r.Post("/auth/refresh", a.refresh)
+	r.Post("/auth/desktop-exchange", a.desktopExchange)
 	r.Get("/ws", a.serveWS)
 	r.Route("/internal", a.internalRoutes)
 	r.Group(func(r chi.Router) {
@@ -66,6 +67,7 @@ func (a *app) routes(r chi.Router) {
 		r.Get("/me/attendance", a.history)
 		r.Get("/auth/logout-summary", a.logoutSummary)
 		r.Post("/auth/logout", a.logout)
+		r.Post("/auth/desktop-code", a.desktopCode)
 	})
 }
 

@@ -144,6 +144,7 @@ An **append-only** log that cannot be modified or erased (enforced by the databa
 ![Help](../img-en/19-aide.png)
 
 - **One-click install** from the site (profile menu or Help page), with the file's **SHA-256 fingerprint** for verification.
+- **Automatic sign-in**: when already signed in on the site, one click on "Open in the PC application" (or "Sign in with my browser" in the application) is enough, with no password to retype. A one-time code valid for 60 seconds is used: no password travels in the link.
 - **Help** page: IT support contacts, frequently asked questions, download.
 
 ---

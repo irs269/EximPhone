@@ -51,6 +51,17 @@ server {
         proxy_set_header X-Forwarded-Proto $scheme;
     }
 
+    location = /api/auth/desktop-exchange {
+        limit_req zone=login burst=${NGINX_LOGIN_BURST} nodelay;
+        set $api_upstream http://api:8080;
+        rewrite ^/api/(.*)$ /$1 break;
+        proxy_pass $api_upstream;
+        proxy_set_header Host $http_host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $remote_addr;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
     location /api/ {
         limit_req zone=api burst=${NGINX_API_BURST} nodelay;
         set $api_upstream http://api:8080;

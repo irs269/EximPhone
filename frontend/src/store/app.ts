@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import * as api from '../api/client';
+import { rememberHandoffRequest } from '../api/desktopHandoff';
 import { ApiError, type Day, type LogoutSummary, type User } from '../api/client';
 import { t } from '../i18n';
 import { useChat } from './chat';
@@ -62,8 +63,19 @@ export const useApp = create<State>((set, get) => ({
   phase: 'loading', user: null, roles: ['employee'], today: null, loginError: '', dialog: null,
 
   async bootstrap() {
+    // links from the PC application / to it carry a one-time code or a request to hand the session over; remove them from the address bar at once
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get('desktop_code');
+    if (params.has('desktop_login')) rememberHandoffRequest();
+    if (code || params.has('desktop_login')) {
+      params.delete('desktop_code'); params.delete('desktop_login');
+      const q = params.toString();
+      window.history.replaceState(null, '', window.location.pathname + (q ? '?' + q : '') + window.location.hash);
+    }
     try {
-      if (await api.refresh()) {
+      const viaCode = code ? await api.desktopExchange(code) : false;
+      if (code && !viaCode) set({ loginError: t('err.desktopCode') });
+      if (viaCode || await api.refresh()) {
         const r = await api.me();
         set({ phase: 'in', user: r.user, roles: r.roles, today: r.attendance, presence: 'on' });
         useChat.getState().start(r.user.id);

@@ -159,6 +159,8 @@ export const fr = {
   'desk.hash': 'Empreinte SHA-256 du fichier : {hash}',
   'meet.rc.viewerHint': "Prise en main indisponible : la personne doit partager un écran entier depuis l'application PC.",
   'meet.rc.shareBrowser': "Prise en main à distance indisponible depuis le navigateur. Pour l'autoriser, partagez un écran entier depuis l'application PC (menu du profil, « Application PC »).",
+  'desk.open': "Ouvrir dans l'application PC", 'desk.openHint': "Application déjà installée ? Elle s'ouvre avec votre session actuelle, sans retaper le mot de passe.",
+  'login.browser': 'Se connecter avec mon navigateur', 'login.browserHint': "Si vous êtes déjà connecté sur le site, vous serez connecté ici sans mot de passe.", 'err.desktopCode': "Le lien de connexion a expiré. Ouvrez de nouveau l'application depuis le site ou saisissez votre mot de passe.",
   'meet.rc.live': 'Prise en main active', 'meet.rc.fullscreen': 'Plein écran', 'meet.rc.exitFullscreen': 'Quitter le plein écran',
   'meet.rc.shareReady': "Prise en main à distance : prête (écran entier, application PC). Les autres participants peuvent la demander.",
   'meet.rc.shareWindow': "Vous partagez une fenêtre : la prise en main à distance n'est possible que pour un écran entier.",

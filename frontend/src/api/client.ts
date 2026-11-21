@@ -40,6 +40,19 @@ export const login = async (username: string, password: string) => {
   token = r.access_token;
   return r;
 };
+/** PC application: turns the one-time code received through eximconnect://signin into a session (access token + refresh cookie). */
+export async function desktopExchange(code: string): Promise<boolean> {
+  try {
+    const r = await fetch('/api/auth/desktop-exchange', {
+      method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code }),
+    });
+    if (!r.ok) return false;
+    token = (await r.json()).access_token;
+    return true;
+  } catch { return false; }
+}
+/** Web: asks for a one-time code (valid 60 s) to hand this session over to the PC application. */
+export const desktopCode = () => request<{ code: string; expires_in: number }>('/auth/desktop-code', { method: 'POST' });
 export const getToken = () => token;
 
 // ---- directory, presence, chat ----

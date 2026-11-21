@@ -4,7 +4,9 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('eximDesktop', {
-  version: 2,
+  version: 3,
+  /** opens the system browser on the site: if the person is signed in there, the session comes back to this application */
+  signInWithBrowser: () => ipcRenderer.send('auth:browser'),
   remoteControl: {
     /** true when this computer can be controlled (Windows, driver loaded) */
     available: () => ipcRenderer.invoke('rc:available'),

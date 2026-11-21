@@ -8,7 +8,7 @@
   "scripts": {
     "start": "electron .",
     "dist": "electron-builder --win",
-    "test": "node --test test/remote.test.js"
+    "test": "node --test test/remote.test.js test/deeplink.test.js"
   },
   "devDependencies": {
     "electron": "^33.2.0",
@@ -25,6 +25,7 @@
       "remote.js",
       "keymap.js",
       "winDriver.js",
+      "deeplink.js",
       "picker.html",
       "banner.html",
       "defaults.json",

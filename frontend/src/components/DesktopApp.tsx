@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { t } from '../i18n';
 import { Icon } from './Icon';
+import { openInDesktopApp } from '../api/desktopHandoff';
 
 interface Manifest { file: string; version: string; size: number; sha256: string; published_at?: string }
 
@@ -31,10 +32,16 @@ export function DesktopApp({ compact = false }: { compact?: boolean }) {
         <small>{t('desk.sub', { version: m.version, size })}</small>
         {!compact && <p>{t('desk.why')}</p>}
         {!compact && windows && <p>{t('desk.steps')}</p>}
+        {!compact && windows && <p>{t('desk.openHint')}</p>}
         {!compact && <p className="dskhash">{t('desk.hash', { hash: m.sha256 })}</p>}
       </div>
       {windows
-        ? <a className="btn" href={`/download/${m.file}`} download>{t('desk.download')}</a>
+        ? (
+          <div className="dskact">
+            <a className="btn" href={`/download/${m.file}`} download>{t('desk.download')}</a>
+            <button type="button" className="btn ghost" title={t('desk.openHint')} onClick={() => void openInDesktopApp()}>{t('desk.open')}</button>
+          </div>
+        )
         : <small>{t('desk.windowsOnly')}</small>}
     </div>
   );

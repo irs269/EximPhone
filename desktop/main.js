@@ -8,6 +8,7 @@ const fs = require('fs');
 const path = require('path');
 const { RemoteControl } = require('./remote');
 const { createWinDriver } = require('./winDriver');
+const { SCHEME, codeFromArgs, signinUrl, browserLoginUrl } = require('./deeplink');
 
 const DEFAULT_URL = 'https://localhost';
 const STOP_SHORTCUT = 'CommandOrControl+Alt+Shift+X';
@@ -17,6 +18,7 @@ let origin = '';
 let shared = null; // what the person is sharing right now: { controllable, displayId } (a whole screen only is controllable)
 let banner = null;
 let rc = null;
+let pendingCode = process.platform === 'win32' ? codeFromArgs(process.argv) : null; // started by an eximconnect:// link
 
 const french = () => app.getLocale().toLowerCase().startsWith('fr');
 const tr = (fr, en) => (french() ? fr : en);
@@ -141,7 +143,40 @@ function setupRemoteControl() {
   ipcMain.on('rc:end', (e) => { if (trusted(e)) rc.end('stopped'); });
   ipcMain.on('rc:shareStopped', (e) => { if (trusted(e)) { shared = null; rc.end('share_stopped'); } });
   // the button of the banner
+  // the sign-in screen: the same hand-over, on demand
+  ipcMain.on('auth:browser', (e) => { if (trusted(e)) void shell.openExternal(browserLoginUrl(serverUrl())); });
   ipcMain.on('rc:kill', (e) => { if (banner && e.sender === banner.webContents) rc.end('stopped_by_owner'); });
+}
+
+// ---------- signing in without typing the password ----------
+
+/** A one-time code arrived (eximconnect://signin?code=...): the site, on OUR configured address, turns it into a session. */
+function openSignin(code) {
+  if (mainWin && !mainWin.isDestroyed()) {
+    void mainWin.loadURL(signinUrl(serverUrl(), code)).catch(() => undefined);
+    if (mainWin.isMinimized()) mainWin.restore();
+    mainWin.focus();
+  } else {
+    pendingCode = code;
+  }
+}
+
+/** Windows opens eximconnect:// links with this application (registered for the current user, no administrator rights). */
+function registerLinks() {
+  try { if (app.isPackaged) app.setAsDefaultProtocolClient(SCHEME); } catch { /* the application still works without the links */ }
+}
+
+/**
+ * Right after the installation the person is usually signed in on the web already: the first time the application starts, the
+ * browser opens the site, which hands the session over (when the browser is signed in the application signs in by itself).
+ * Never in development, and EXIM_NO_BROWSER_LOGIN=1 turns it off (automated tests).
+ */
+function firstRunBrowserLogin() {
+  if (!app.isPackaged || process.env.EXIM_NO_BROWSER_LOGIN === '1') return;
+  const marker = path.join(app.getPath('userData'), 'first-run.json');
+  if (fs.existsSync(marker)) return;
+  try { fs.writeFileSync(marker, JSON.stringify({ at: new Date().toISOString() })); } catch { return; }
+  setTimeout(() => { void shell.openExternal(browserLoginUrl(serverUrl())); }, 2500);
 }
 
 // ---------- window ----------
@@ -192,8 +227,10 @@ function createWindow(url) {
 if (!app.requestSingleInstanceLock()) {
   app.quit();
 } else {
-  app.on('second-instance', () => {
+  app.on('second-instance', (_e, argv) => {
     const [w] = BrowserWindow.getAllWindows();
+    const code = codeFromArgs(argv);
+    if (code) openSignin(code);
     if (w) { if (w.isMinimized()) w.restore(); w.focus(); }
   });
   // Accept a self-signed server certificate only when it is exactly the one pinned in the settings.
@@ -207,7 +244,11 @@ if (!app.requestSingleInstanceLock()) {
   app.whenReady().then(() => {
     Menu.setApplicationMenu(null);
     setupRemoteControl();
-    createWindow(serverUrl());
+    const first = pendingCode ? signinUrl(serverUrl(), pendingCode) : serverUrl();
+    createWindow(first);
+    registerLinks();
+    if (!pendingCode) firstRunBrowserLogin();
+    pendingCode = null;
   });
   app.on('will-quit', () => { globalShortcut.unregisterAll(); rc?.end('closed'); });
   app.on('window-all-closed', () => app.quit());

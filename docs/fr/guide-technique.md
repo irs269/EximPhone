@@ -70,7 +70,7 @@
 | Courrier | SMTP (STARTTLS / TLS), IMAP, MIME (UTF-8) |
 | Chiffrement au repos | AES-256-GCM (messages, courrier, pièces jointes, enregistrements, secrets SIP) |
 | Sauvegardes | AES-256 avec clé dérivée par PBKDF2 |
-| Jetons | JWT (jeton d'accès de 15 minutes, cookie de rafraîchissement HttpOnly ; jeton de réunion de 2 minutes) |
+| Jetons | JWT (jeton d'accès de 15 minutes, cookie de rafraîchissement HttpOnly ; jeton de réunion de 2 minutes ; code de connexion de l'application PC de 60 secondes, à usage unique) |
 
 ---
 
@@ -183,6 +183,29 @@ sequenceDiagram
 ```
 
 Les mots de passe ne sont jamais stockés : Active Directory est la seule autorité.
+
+### 4.1 bis Connexion automatique de l'application PC (code à usage unique)
+
+```mermaid
+sequenceDiagram
+  participant W as Site (navigateur, connecté)
+  participant A as api
+  participant R as Redis
+  participant OS as Windows
+  participant D as Application PC
+  W->>A: POST /auth/desktop-code (session ouverte)
+  A->>R: SET dc:hash(code) = utilisateur, durée 60 s
+  A-->>W: code (43 caractères, 256 bits)
+  W->>OS: ouvre eximconnect://signin?code=...
+  OS->>D: démarre ou prévient l'application (second-instance)
+  D->>A: charge le site sur SON adresse configurée avec ?desktop_code=...
+  A->>R: GETDEL (usage unique)
+  A->>A: utilisateur actif ? journée ouverte ?
+  A-->>D: jeton d'accès + cookie de rafraîchissement HttpOnly
+  Note over A,D: pas de nouveau pointage ; tout échec renvoie 401 sans détail
+```
+
+Le lien ne porte **que** le code ; l'adresse du serveur vient toujours des réglages de l'application, jamais du lien. Le code est stocké haché, vaut 60 secondes et ne sert qu'une fois. Le sens inverse existe : l'application ouvre le navigateur sur `/?desktop_login=1`, et le site, une fois connecté, renvoie la session à l'application par le même mécanisme.
 
 ### 4.2 Événements en temps réel (messages, courrier, tickets, annonces)
 
@@ -416,8 +439,8 @@ L'**application PC** se construit avec `scripts/build-desktop.ps1 -Url <serveur>
 |---|---|---|---|
 | Unitaire (Go) | `go test -race` | 16 fichiers de tests | règles de pointage, cryptographie, authentification SIP, logique du SFU et de la prise de contrôle, analyse du courrier |
 | Unitaire (web) | Vitest | 8 tests | fonctions utilitaires, traductions, couleurs de la charte |
-| Unitaire (PC) | lanceur de tests Node | 15 tests | règles de la prise de contrôle, correspondance des touches |
-| Bout en bout | scripts Node sur la vraie pile | 232 vérifications | `realtime` 22, `calls` 23, `hr` 36, `tickets` 35, `mail` 54, `mail-external` 22, `meetings` 40 |
+| Unitaire (PC) | lanceur de tests Node | 19 tests | règles de la prise de contrôle, correspondance des touches |
+| Bout en bout | scripts Node sur la vraie pile | 242 vérifications | `realtime` 22, `calls` 23, `hr` 36, `tickets` 35, `mail` 54, `mail-external` 22, `meetings` 40, `desktop-signin` 10 |
 | Charge | `scripts/load-test.sh`, tests de charge `services/e2e` | à la demande | connexions simultanées, messages, branches téléphoniques |
 | Sécurité | Trivy (`scripts/scan.sh`, CI) | par image | vulnérabilités connues (un niveau CRITICAL bloque la construction) |
 

@@ -13,6 +13,16 @@ Exim Connect s'utilise de deux façons, avec le même compte :
 - **dans un navigateur** (Chrome, Edge…), à l'adresse communiquée par la DSI ;
 - **avec l'application PC** (Windows), qui s'ouvre comme un logiciel ordinaire. Elle est **nécessaire pour la prise de contrôle à distance** (voir § 5.5). Pour l'installer : menu de votre profil (en bas à gauche) → **Télécharger et installer**, ou page **Aide**.
 
+### 1.1 bis Être connecté automatiquement dans l'application PC
+
+Vous n'avez **pas besoin de retaper votre mot de passe** dans l'application PC si vous êtes déjà connecté sur le site :
+
+- **Depuis le site** : dans le menu du profil ou la page **Aide**, cliquez sur **Ouvrir dans l'application PC**. Windows peut demander l'autorisation d'ouvrir Exim Connect : acceptez. L'application s'ouvre avec votre session.
+- **Depuis l'application** : sur l'écran de connexion, cliquez sur **Se connecter avec mon navigateur**. Le navigateur s'ouvre ; si vous y êtes déjà connecté, vous revenez dans l'application connecté.
+- **Juste après l'installation** : au tout premier démarrage de l'application, le navigateur s'ouvre une fois pour faire cela automatiquement.
+
+Ce mode ne crée **pas de nouveau pointage** : votre arrivée reste celle de votre première connexion de la journée. Si vous avez pointé votre départ entre-temps, il faut de nouveau saisir votre mot de passe.
+
 ### 1.2 Se connecter
 
 ![Page de connexion](../img/01-connexion.png)

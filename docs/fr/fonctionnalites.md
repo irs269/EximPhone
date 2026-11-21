@@ -144,6 +144,7 @@ Journal **en ajout seul**, impossible à modifier ou effacer (protégé par la b
 ![Aide](../img/19-aide.png)
 
 - **Installation en un clic** depuis le site (menu du profil ou page Aide), avec **empreinte SHA-256** du fichier pour vérification.
+- **Connexion automatique** : déjà connecté sur le site, un clic sur « Ouvrir dans l'application PC » (ou « Se connecter avec mon navigateur » dans l'application) suffit, sans retaper le mot de passe. Un code à usage unique de 60 secondes est utilisé : aucun mot de passe ne circule dans le lien.
 - Page **Aide** : contact du support IT, questions fréquentes, téléchargement.
 
 ---
