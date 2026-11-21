@@ -39,8 +39,13 @@ if ($PinServerCertificate) {
 
 # 2. copy the sources to the short build folder (node_modules and dist stay there between runs)
 New-Item -ItemType Directory -Force -Path $work | Out-Null
-$files = 'main.js', 'offline.html', 'preload.js', 'ui-preload.js', 'remote.js', 'keymap.js', 'winDriver.js', 'picker.html', 'banner.html', 'icon.png', 'package.json', 'package-lock.json'
+$files = 'main.js', 'offline.html', 'preload.js', 'ui-preload.js', 'remote.js', 'keymap.js', 'winDriver.js', 'deeplink.js', 'picker.html', 'banner.html', 'icon.png', 'package.json', 'package-lock.json'
 foreach ($f in $files) { Copy-Item -Force (Join-Path $src $f) (Join-Path $work $f) }
+# every local module that main.js requires must be in the package, otherwise the installed application would not start
+foreach ($m in [regex]::Matches((Get-Content (Join-Path $src 'main.js') -Raw), "require\('\./([A-Za-z0-9_-]+)'\)")) {
+  $mod = $m.Groups[1].Value + '.js'
+  if (-not (Test-Path (Join-Path $work $mod))) { throw "main.js requires $mod but the build does not package it: add it to the file list of this script" }
+}
 [System.IO.File]::WriteAllText((Join-Path $work 'defaults.json'), ($defaults | ConvertTo-Json), (New-Object System.Text.UTF8Encoding($false)))
 
 # 3. build
